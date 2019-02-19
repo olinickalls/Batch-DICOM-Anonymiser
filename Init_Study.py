@@ -11,11 +11,8 @@ Experimenting with openpyxl to read/edit/save .XLSX files
 import os
 import argparse
 from datetime import date, time, datetime
-
 import openpyxl
-
 from console_progressbar import ProgressBar
-
 import studytools
 
 
@@ -24,22 +21,28 @@ import studytools
 
 parser = argparse.ArgumentParser(description='Create a template .xlsx anonymisation file for your study.')
 
-parser.add_argument('filename', metavar='<filename>', type=str, default="template",
+parser.add_argument('filename', metavar='<filename>', 
+                     type=str, default="template",
 	                 help='Template <filename>.xlsx to create (no spaces allowed)')
 
-parser.add_argument('-title', metavar='<Study Title>', type=str, default='Default Study Title',
+parser.add_argument('-title', metavar='<Study Title>', 
+	                 type=str, default='Default Study Title',
 	                 help='Title of Study')
 
-parser.add_argument('-PI', metavar='<PI name>', type=str, default='<PI name here>', 
+parser.add_argument('-PI', metavar='<PI name>', 
+	                 type=str, default='<PI name here>', 
                      help='Primary Investigator (PI) name')
 
-parser.add_argument('-n', metavar='<No. of StudyIDs>', type=int, default=1000, 
+parser.add_argument('-n', metavar='<No. of StudyIDs>', 
+	                 type=int, default=1000, 
                      help='Number of Study IDs to create (default = 1000)')
 
-parser.add_argument('-format', metavar='<SID format>', type=str, default='uudddd',
+parser.add_argument('-format', metavar='<SID format>', 
+	                 type=str, default='uudddd',
 	                 help='Study ID Format (default = \"uudddd\") (U)pper, (L)ower, (C)har of either case, (D)igit')
 
-parser.add_argument('-prefix', metavar='<SID prefix>', type=str, default='',
+parser.add_argument('-prefix', metavar='<StudyID prefix>', 
+	                 type=str, default='',
 	                 help='Study ID Prefix (default = blank)')
 
 args = parser.parse_args()
@@ -102,11 +105,11 @@ else:
 	print(f'Created blank template file \"{XLSFilename}\" OK')
 
 
-wsFront = wb.active
+wsFront       = wb.active
 wsFront.title = 'Front'
 
 wsData = wb.create_sheet('Data') # insert log sheet at the end
-wsLog = wb.create_sheet('log')   # insert log sheet at the end
+wsLog  = wb.create_sheet('log')   # insert log sheet at the end
 
 #--------------------->  Add in basic data  <-------------------------
 
@@ -153,9 +156,9 @@ StudyIDs = []
 # Pandas could be faster using dataframes and the 'duplicated' method
 # but why involve pandas in such a small script that is not time-sensitive?
 
-print('Creating Study IDs.')
-print(f'Example format: {olitools.create_rnd_studyID( args.format, args.prefix )}')
+print('\nCreating Study IDs.')
 print(f'Format={args.format}, prefix=\"{args.prefix}\"')
+print(f'Example format: {studytools.create_rnd_studyID( args.format, args.prefix )}\n')
 
 pb = ProgressBar(total=50,
 	             prefix='Generating Study IDs', 
@@ -174,7 +177,7 @@ collisions = 0
 
 # needs a sanity check - are there enough possible StudyIDs available with the requested format?
 
-max_no_IDs = olitools.number_possible_IDs( args.format )
+max_no_IDs = studytools.number_possible_IDs( args.format )
 print(f'Total IDs possible with current format: {max_no_IDs}')
 
 if max_no_IDs > number_of_study_IDs:
@@ -188,7 +191,7 @@ while IDsCreated < number_of_study_IDs:
 	#Get new randomly created study ID in the correct format
 	# This could be replaced by a generator but a fn will do for now
 
-	newID = olitools.create_rnd_studyID( args.format, args.prefix )
+	newID = studytools.create_rnd_studyID( args.format, args.prefix )
 
 	#Compare with the existing list StudyIDs
 	# Only add to list if it is unique
