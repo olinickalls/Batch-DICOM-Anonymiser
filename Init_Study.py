@@ -21,28 +21,36 @@ import studytools
 
 parser = argparse.ArgumentParser(description='Create a template .xlsx anonymisation file for your study.')
 
-parser.add_argument('filename', metavar='<filename>', 
+parser.add_argument('filename', 
+	                 metavar='<filename>', 
                      type=str, default="template",
 	                 help='Template <filename>.xlsx to create (no spaces allowed)')
 
 parser.add_argument('-title', metavar='<Study Title>', 
-	                 type=str, default='Default Study Title',
+	                 type=str, 
+	                 default='Default Study Title',
 	                 help='Title of Study')
 
 parser.add_argument('-PI', metavar='<PI name>', 
-	                 type=str, default='<PI name here>', 
+	                 type=str, 
+	                 default='<PI name here>', 
                      help='Primary Investigator (PI) name')
 
 parser.add_argument('-n', metavar='<No. of StudyIDs>', 
-	                 type=int, default=1000, 
+	                 type=int, 
+	                 default=1000, 
                      help='Number of Study IDs to create (default = 1000)')
 
-parser.add_argument('-format', metavar='<SID format>', 
-	                 type=str, default='uudddd',
+parser.add_argument('-format', 
+	                 metavar='<SID format>', 
+	                 type=str, 
+	                 default='uudddd',
 	                 help='Study ID Format (default = \"uudddd\") (U)pper, (L)ower, (C)har of either case, (D)igit')
 
-parser.add_argument('-prefix', metavar='<StudyID prefix>', 
-	                 type=str, default='',
+parser.add_argument('-prefix', 
+	                 metavar='<StudyID prefix>', 
+	                 type=str, 
+	                 default='',
 	                 help='Study ID Prefix (default = blank)')
 
 args = parser.parse_args()
