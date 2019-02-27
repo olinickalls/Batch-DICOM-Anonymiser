@@ -27,23 +27,24 @@ import os         # for os.walk() primarily
 import sys        # cmd line arguments
 import pydicom    # DICOM - obviously...
 import shutil     # used for just file copying.
+import openpyxl   # For excel file access
+
+from BAModules import *     # Not the cleanest way of doing this- future name change needed
+import studytools
 
 
-from BAModules import *
-
-##### This code is largely lifted from the pyDICOM userguide
-# https://pydicom.github.io/pydicom/dev/auto_examples/metadata_processing/plot_anonymize.html
-# additions to blank all date and time values.
 
 
 print( os.path.basename(__file__) )
 
 
+xls_filename = 'test_file.xlsx'
+
 print('Formatting input files...')
 
 file_paths = sys.argv[1:]  # the first argument is the script itself
 
-
+ 
 
 if len(file_paths) == 0:
 	print('No input found. Defaulting to test string.')
@@ -68,15 +69,18 @@ for p in file_paths:
 
 #print('File List complete.')
 
-'''
-# warning msg if more than 1 cmd line argument
-if len(file_paths) > 1:
-	print('Multiple lines received from cmd line. Those after the 1st will be ignored.\n')
-'''    
 print('\n')
 
+#--------------------> Open XLSX to read/write
 
-#Beginning of loop for multiple directories
+study_wb = studytools.load_study_xls( xls_filename )
+
+if study_wb == False:
+	print(f'Fatal Error: Unable to open file {xls_filename}')
+	exit()
+
+
+#--------------------> Process multiple directories
 
 # Count some dir and file stats
 all_dir_count = 0
@@ -86,6 +90,8 @@ all_copyOK = 0
 all_copyfailed = 0
 all_anonok = 0
 all_anonfailed = 0
+
+unique_pt_IDs = []
 
 
 #loop through all the folders/files in file_paths[] 

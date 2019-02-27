@@ -10,11 +10,10 @@ Experimenting with openpyxl to read/edit/save .XLSX files
 
 import os
 import argparse
-from datetime import date, time, datetime
+
 import openpyxl
 from console_progressbar import ProgressBar
 import studytools
-
 
 
 #--------------------> Parsing Options & Setup <-------------------------------
@@ -71,7 +70,7 @@ for letter in args.format:
 	if letter not in ['d','l','u','c']: # Digit, Lower, Upper, Char (either upper or lower)
 		print(f'Fatal Error: Incorrect StudyID format: \"{args.format}\"')
 		print('Please use only \"d\",\"l\",\"u\",\"c\"')
-		raise
+		exit()
 
 
 #--------------------> Validate Filename <-------------------------------
@@ -85,7 +84,7 @@ if "." in args.filename:
 	print(f'\tWarning: Removing \".\" in \"{args.filename}\"')
 	args.filename = args.filename.replace(".", "")
 
-XLSFilename = args.filename + '.xlsx'
+xls_Filename = args.filename + '.xlsx'
 
 #---------------------> Housekeeping <----------------------------
 
@@ -98,57 +97,14 @@ number_of_study_IDs = args.n
 #-------------------------------------------------------------
 
 
-#-------------------> Create XLS workbook & config sheets <----------------------------
-# wb = workbook
-# ws = worksheet
+# replaced by:
+# studytools.
 
-wb = openpyxl.Workbook()
+study_wb = studytools.create_new_study_xls_file( xls_Filename,
+                               args.title,
+	    					   args.PI,
+							   number_of_study_IDs )
 
-try:
-	wb.save(XLSFilename)
-except:
-	print(f'Fatal Error: Failed to save \"{XLSFilename}\"')
-	raise
-else:
-	print(f'Created blank template file \"{XLSFilename}\" OK')
-
-
-wsFront       = wb.active
-wsFront.title = 'Front'
-
-wsData = wb.create_sheet('Data') # insert log sheet at the end
-wsLog  = wb.create_sheet('log')   # insert log sheet at the end
-
-#--------------------->  Add in basic data  <-------------------------
-
-wsFront['A1'] = 'Front Page'
-
-wsFront['A2'] = 'Study Title:'
-wsFront['B2'] = args.title
-
-wsFront['A3'] = 'Primary Investigator:'
-wsFront['B3'] = args.PI
-
-wsFront['A4'] = 'No of Study IDs'
-wsFront['B4'] = number_of_study_IDs
-
-wsData['A1']  = 'Data Page'
-wsData['B1']  = 'Study IDs'
-wsData['C1']  = 'Date Added'
-wsData['D1']  = 'Time Added'
-wsData['E1']  = 'Batch'
-
-wsData['F1']  = 'Patient Real IC'
-wsData['G1']  = 'Accession No.'
-wsData['H1']  = 'Study Date'
-
-wsLog['A1']   = 'Log Page'
-
-wsLog['B1']   = 'Date'
-wsLog['C1']   = 'Time'
-wsLog['D1']   = 'Log Activity'
-wsLog['E1']   = 'User'
-wsLog['F1']   = 'Computer'
 
 #--------------------->  Create Study IDs  <-------------------------
 
@@ -188,11 +144,12 @@ collisions = 0
 max_no_IDs = studytools.number_possible_IDs( args.format )
 print(f'Total IDs possible with current format: {max_no_IDs}')
 
-if max_no_IDs > number_of_study_IDs:
-	print(f'Fatal Error: Impossible to create {number_of_study_IDs} Study IDs with current ID format.')
+if  number_of_study_IDs > max_no_IDs:
+	print(f'Fatal Error: Impossible to create {number_of_study_IDs} Study IDs with current ID format: \'{args.format}\'.')
 	print('Please try again with revised ID format or create fewer IDs.')
-elif max_no_IDs > (0.9 * number_of_study_IDs):
-	print(f'Warning: Creating {((number_of_study_IDs/number_possible_IDs)*100)}% of possible Study IDs in current format.')
+	exit()
+elif number_of_study_IDs > (0.98 * max_no_IDs ):
+	print(f'Warning: Creating {((number_of_study_IDs/max_no_IDs)*100)}% of possible Study IDs in current format: \'{args.format}\'.')
 	print('This may be slow.')
 
 while IDsCreated < number_of_study_IDs:
@@ -221,36 +178,28 @@ print(f'{collisions} collisions.\n\n')
 
 #--------------------->  Copy into Data Worksheet  <-------------------------
 
+wsData = study_wb[ 'Data' ]
 row = 2
 for ID in StudyIDs:
-	wsData['B'+str(row)] = ID
+	wsData[ studytools.xlsData_study_IDs +str(row) ] = ID
 	row += 1
 
 #----------------------> Log the creation <-----------------------
 
-import getpass
+studytools.log_xls_creation( study_wb, 
+                            number_of_study_IDs,
+							args.prefix,
+							args.format )
 
-username = getpass.getuser()
-compname = os.environ['COMPUTERNAME']
-dateobject = datetime.now()
-date = dateobject.strftime('%d-%m-%Y')
-timenow = dateobject.strftime('%S:%M:%H')
-
-
-wsLog['B2']   =  date  #'Date'
-wsLog['C2']   =  timenow  #'Time'
-wsLog['D2']   =  f'Created XLSX file (n={number_of_study_IDs}, format={args.prefix}{args.format})'  #'Log Activity'
-wsLog['E2']   =  username  #'User'
-wsLog['F2']   =  compname  #'Computer'
 
 #--------------------->  Save XLSX file  <-------------------------
 
 try:
-	wb.save(XLSFilename)
+	study_wb.save( xls_Filename )
 except:
-	print(f'Fatal Error: Failed to save \"{XLSFilename}\"')
+	print(f'Fatal Error: Failed to save \"{ xls_Filename }\"')
 	raise
 else:
-	print(f'Successfully saved \"{XLSFilename}\"')
+	print(f'Successfully saved \"{ xls_Filename }\"')
 
 
