@@ -42,9 +42,15 @@ xls_filename = 'test_file.xlsx'
 
 print('Formatting input files...')
 
+
+
+
 file_paths = sys.argv[1:]  # the first argument is the script itself
 
- 
+if len( file_paths ) < 1:
+	file_paths = [ 'C:\\Users\\oliver\\Documents\\pycode\\Batch-DICOM-Anonymiser\\001_test' ]
+
+
 
 if len(file_paths) == 0:
 	print('No input found. Defaulting to test string.')
@@ -73,12 +79,20 @@ print('\n')
 
 #--------------------> Open XLSX to read/write
 
-study_wb = studytools.load_study_xls( xls_filename )
+study_wb, studytools.xls_UID_lookup = studytools.load_study_xls( xls_filename )
 
 if study_wb == False:
 	print(f'Fatal Error: Unable to open file {xls_filename}')
 	exit()
 
+print(f'Loaded XLS. Found {len( studytools.xls_UID_lookup )} previously deidentified studie(s).')
+
+
+try:
+	study_wb.save( xls_filename )
+except:
+	print(f'{xls_filename} save permission denied. Is the file open in excel?.\nPlease unlock and try again.')
+	raise
 
 #--------------------> Process multiple directories
 
@@ -90,8 +104,6 @@ all_copyOK = 0
 all_copyfailed = 0
 all_anonok = 0
 all_anonfailed = 0
-
-unique_pt_IDs = []
 
 
 #loop through all the folders/files in file_paths[] 
@@ -106,7 +118,10 @@ for rootDir in file_paths:
 	#  and makes it the new anonymised pt name
 	#  e.g. if rootDir = 'c:\stuff\mydicim\ptZERO' then AnonName becomes 'ptZERO' 
 	AnonName = rootDir[ -rootDir[-1::-1].find('\\') : ] 
-	
+
+	if study_wb['Front'][ studytools.xlsFront_IRB_code_cell ].value:
+		AnonName = study_wb['Front'][ studytools.xlsFront_IRB_code_cell ].value
+ 
 	AnonID = 'RESEARCH'
 	
 	
@@ -164,6 +179,9 @@ for rootDir in file_paths:
 			# print each file namejust  before testing - end='' to prevent the \n & flush to push to screen
 			print( f'\ttest {testfilename}', end='', flush=True )
 
+			# Skip DICOMDIR files. Do not copy. Do no try to read.
+			if fname == 'DICOMDIR':
+				break
 
 			# Try to open each file with pydicom to validate it.
 			# print '--OK--' if successful, '--FAILED--' if not then move on.
@@ -186,23 +204,56 @@ for rootDir in file_paths:
 					copyOK += 1
 
 
-			else:  # Do this if the files is DICOM
+			else:  # Do this if the file is DICOM
 				valid_DCM_file += 1
 				print('\t-DICOM- Anonymise', end='')
 
-				try:  # the actual anonymisation
-					anonymiseDICOM( testdcmobj, AnonName, AnonID )   # anonymiseDICOM ( file-like object, name string, ID string )
-					testdcmobj.save_as( savefilename, write_like_original=True)
+				#try:  # the actual anonymisation
+					
+				# test_study_UID = testdcmobj.StudyInstanceUID
+				test_study_UID = studytools.get_DCM_StudyInstanceUID( testdcmobj )
+				if not test_study_UID:
+					print(f'\n\t\tFailed to find StudyInstanceUID in DCM. Skipping file { fname }, test_study_UID = { test_study_UID }')
+					break
 
-				except:
-					print('\t++FAILED++')
-					anonfailed += 1
+				# step 1 - grab pt identifiers a see if match existing study UID
+				print(f'\nTry: deidentification loop')
+				print(f'test_study_UID = {test_study_UID}')
+				print(f'lookup dict = {studytools.xls_UID_lookup}')
 
+				if test_study_UID in studytools.xls_UID_lookup:
+					# This happens if the study UID is known (possible re-anonymisation)
+					print(f'\nKnown UID')
+					AnonID = studytools.get_old_study_attrib( study_wb, studytools.xls_UID_lookup, test_study_UID, studytools.xlsData_study_IDs )
+					print(f'AnonID = {AnonID}')
 				else:
-					print('\tOK')
-					anonok += 1
+					# If UNIQUE study UID (needs new studyID)
+					print(f'\nUnique UID')
+					AnonID = studytools.assign_next_free_studyID( study_wb, testdcmobj )
+				
+				
+				
+				print(f'DeIdentify using name: { AnonName }\tID: { AnonID }')
+				deidentifyDICOM( testdcmobj, AnonName, AnonID )   # deidentifyDICOM ( file-like object, name string, ID string )
+				#print('-deidentifyDICOM- done')
+				testdcmobj.save_as( savefilename, write_like_original=True)
+				#print('-testdcmobj.save_as- done')
+				
+				#studytools.write_xls_to_disc( study_wb, xls_filename ) ----- Moved to the end as this step reeeeaaaaly slows things down
+				#print('-write_xls_to_disc- done')
+
+				#except:
+				#	print('\t++FAILED++')
+				#	anonfailed += 1
+
+				#else:
+				#	print('\tOK')
+				#	anonok += 1
+				
 
 
+
+	
 
 	# Stats on exit
 	all_dir_count += dir_count
@@ -235,4 +286,6 @@ print(f'all_copyOK \t{all_copyOK}')
 print(f'all_copyfailed \t{all_copyfailed}')
 print(f'all_anonok \t{all_anonok}')
 print(f'all_anonfailed \t{all_anonfailed}')
+
+studytools.write_xls_to_disc( study_wb, xls_filename )
 
