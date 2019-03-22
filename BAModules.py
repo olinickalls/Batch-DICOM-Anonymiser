@@ -7,7 +7,6 @@ using pyDICOM (originally version 1.2.1)
 
 '''
 
-#def log_text( logfile, )
 
 
 def tag_data_type_callback(dataset, data_element):
@@ -34,7 +33,9 @@ def curves_callback(dataset, data_element):
 
 #	These are fairly specific- taken from sample DICOM studies.
 
-def anonymiseDICOM( DCOobj, newPtName = 'Anon', newPtID = 'research' ):
+def deidentifyDICOM( DCOobj, newPtName = 'Anon', newPtID = 'research' ):
+
+	print(f'deidentifyDICOM received newPtName={newPtName} \tnewPtID={newPtID} ')
 
 	DCOobj.remove_private_tags()
 	DCOobj.walk(tag_data_type_callback)
@@ -43,8 +44,8 @@ def anonymiseDICOM( DCOobj, newPtName = 'Anon', newPtID = 'research' ):
     # (0008, ) tags
 
 	DCOobj.AccessionNumber = ''  
-	DCOobj.StudyID = ''
-	DCOobj.StudyDescription = ''
+	DCOobj.StudyID = ''           # Often contains the same data as AccessionNumber
+	# DCOobj.StudyDescription = ''
 	DCOobj.InstitutionalDepartmentName = 'St Elsewhere Radiology'
 	DCOobj.InstitutionAddress = ''   # (0008, 0081) 
 
@@ -70,10 +71,14 @@ def anonymiseDICOM( DCOobj, newPtName = 'Anon', newPtID = 'research' ):
 	DCOobj.DetectorDescription = ''
 	DCOobj.DetectorID = ''
 
-	try:
+	if 'RequestAttributeSequence' in DCOobj:
 		del DCOobj.RequestAttributesSequence
-	except Exception as e:
-		pass
+
+
+	#try:
+	#	del DCOobj.RequestAttributesSequence
+	#except Exception as e:
+	#	pass
 
 
 
