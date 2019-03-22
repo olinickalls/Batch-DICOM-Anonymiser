@@ -124,14 +124,21 @@ print('\nCreating Study IDs.')
 print(f'Format={args.format}, prefix=\"{args.prefix}\"')
 print(f'Example format: {studytools.create_rnd_studyID( args.format, args.prefix )}\n')
 
-pb = ProgressBar(total=50,
+# Protect against div by zero error from ProgressBar when n<number of intervals
+if args.n >= 50:
+	progressintervals = 50
+else:
+	progressintervals = args.n
+print(f'progressintervals = {progressintervals}')
+
+pb = ProgressBar(total=progressintervals,
 	             prefix='Generating Study IDs', 
 	             suffix='Complete', 
 	             decimals=0, 
-	             length=50, 
+	             length=progressintervals, 
 	             fill='X', 
 	             zfill='-')
-ProgressStep = int( number_of_study_IDs / 50 )
+ProgressStep = int( number_of_study_IDs / progressintervals )
 Next_Progress_Step = 0
 collisions = 0
 
@@ -142,7 +149,7 @@ collisions = 0
 # needs a sanity check - are there enough possible StudyIDs available with the requested format?
 
 max_no_IDs = studytools.number_possible_IDs( args.format )
-print(f'Total IDs possible with current format: {max_no_IDs}')
+print(f'Generating {number_of_study_IDs} out of possible maximum of {max_no_IDs} (with current format)')
 
 if  number_of_study_IDs > max_no_IDs:
 	print(f'Fatal Error: Impossible to create {number_of_study_IDs} Study IDs with current ID format: \'{args.format}\'.')

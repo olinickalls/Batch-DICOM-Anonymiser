@@ -7,7 +7,6 @@ using pyDICOM (originally version 1.2.1)
 
 '''
 
-#def log_text( logfile, )
 
 
 def tag_data_type_callback(dataset, data_element):
@@ -72,10 +71,14 @@ def deidentifyDICOM( DCOobj, newPtName = 'Anon', newPtID = 'research' ):
 	DCOobj.DetectorDescription = ''
 	DCOobj.DetectorID = ''
 
-	try:
+	if 'RequestAttributeSequence' in DCOobj:
 		del DCOobj.RequestAttributesSequence
-	except Exception as e:
-		pass
+
+
+	#try:
+	#	del DCOobj.RequestAttributesSequence
+	#except Exception as e:
+	#	pass
 
 
 
