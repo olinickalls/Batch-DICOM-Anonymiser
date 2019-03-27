@@ -4,8 +4,11 @@ encomapsses:
 	openpyxl and pydicom objects
 	simple variables (like cell and column definitions)
 	methods:
-
 '''
+
+# PEP 8 compliance is a work in progress... sigh 
+
+
 import pydicom
 import openpyxl
 import random
@@ -15,104 +18,115 @@ from datetime import date, time, datetime
 
 
 
-alphalistboth = ['a','b','c','d','e','f','g','h','i','j','k','l','m','o','n','p','q','r',
-								's','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J',
-								'K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
-alphalistupper = ['A','B','C','D','E','F','G','H','I','J',
-									'K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
-alphalistlower = ['a','b','c','d','e','f','g','h','i','j','k','l','m','o','n','p','q','r',
-									's','t','u','v','w','x','y','z' ]
+alphalistboth = ['a','b','c','d','e','f','g','h','i','j','k','l','m','o','n',
+                 'p','q','r','s','t','u','v','w','x','y','z','A','B','C','D',
+				 'E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S',
+				 'T','U','V','W','X','Y','Z'
+				]
+alphalistupper = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N',
+                  'O','P','Q','R','S','T','U','V','W','X','Y','Z'
+				 ]
+alphalistlower = ['a','b','c','d','e','f','g','h','i','j','k','l','m','o',
+                  'n','p','q','r','s','t','u','v','w','x','y','z' 
+				 ]
 
 digitlist = [ '0','1','2','3','4','5','6','7','8','9' ]
 
 
 class Study_Class( ):
-	# Some constants to use in this library - needs to replace much of the static parts of the XLS creation:
-	# These are column or cell references prefixed with which sheet they belong in
-	xlsPage_Title              = 'A1'
+	# Some constants to use in this library
+	# These are column or cell references prefixed by the sheet they belong in
+	# The constants could be moved into a separate 'from _ import *' as they
+	# don't, need to be accessed through the class -I just want them global
 
-	xlsFront_study_title_cell    = 'B2'
-	xlsFront_PI_cell             = 'B3'
-	xlsFront_IRB_code_cell       = 'B4'
-	xlsFront_number_of_study_IDs_cell = 'B5' 
+	XLSPAGE_TITLE = 'A1'
 
-	xlsData_study_IDs          = 'B'
-	xlsData_date_added         = 'C'
-	xlsData_time_added         = 'D'
-	xlsData_patient_name       = 'G'
-	xlsData_patient_ID         = 'I'
-	xlsData_accession_number   = 'K'
-	xlsData_study_date         = 'M'
-	xlsData_study_time         = 'N'
-	xlsData_study_UID          = 'P'
-	xlsData_study_description  = 'R'
+	XLSFRONT_STUDYTITLE_CELL = 'B2'
+	XLSFRONT_PI_CELL = 'B3'
+	XLSFRONT_IRB_CODE_CELL = 'B4'
+	XLSFRONT_NUMBER_OF_STUDYIDS_CELL = 'B5' 
 
-	xlsLog_date                = 'B'
-	xlsLog_time                = 'C'
-	xlsLog_activity            = 'E'
-	xlsLog_user                = 'G'
-	xlsLog_computer            = 'H'
+	XLSDATA_STUDYIDS = 'B'
+	XLSDATA_DATEADDED = 'C'
+	XLSDATA_TIMEADDED = 'D'
+	XLSDATA_PATIENTNAME = 'G'
+	XLSDATA_PATIENTID = 'I'
+	XLSDATA_ACCESSIONNUMBER = 'K'
+	XLSDATA_STUDYDATE = 'M'
+	XLSDATA_STUDYTIME = 'N'
+	XLSDATA_STUDYUID = 'P'
+	XLSDATA_STUDYDESCRIPTION = 'R'
+
+	XLSLOG_DATE = 'B'
+	XLSLOG_TIME = 'C'
+	XLSLOG_ACTIVITY = 'E'
+	XLSLOG_USER = 'G'
+	XLSLOG_COMPUTER = 'H'
 
 	xls_UID_lookup             = {}
 	test_study_UID             = ''
-	# xlsLog_next_log_row        = 0
+	
 	next_log_row               = 0
-
 	next_studyID_row           = 0
 
-
-	frontsheet                 = 0
-	datasheet                  = 0
-	logsheet                   = 0
+	# These will have values assigned after the workbook is opened
+	frontsheet = None
+	datasheet = None
+	logsheet = None
 
 	# log levels: debug = 3, high = 2, normal = 1
-	# This should reflect the default, then over-ridden by cmd line options. 
-	loglevel_normal  = 1
-	loglevel_high    = 2
-	loglevel_debug   = 3
-	global_log_level = 1
-	loglevel_txt = { loglevel_normal: '', loglevel_high: 'High', loglevel_debug: 'DEBUG' }
+	# This should reflect the default, then over-ridden by cmd line options.
+	LOGLEVEL_NORMAL = 1
+	LOGLEVEL_HIGH = 2
+	LOGLEVEL_DEBUG = 3
+	GLOBAL_LOGLEVEL = 1
+	LOGLEVEL_TXT = {LOGLEVEL_NORMAL: '',
+	                LOGLEVEL_HIGH: 'High', 
+					LOGLEVEL_DEBUG: 'DEBUG'
+				   }
 
-	# Get these only once at the start of runtime.  No need to repeat for every new log entry.
-	log_username     = getpass.getuser()
+	# Get these only once at the start of runtime.
+	log_username = getpass.getuser()
 	log_computername = os.environ['COMPUTERNAME']
 
-
 	# List of filenames to ignore. These will be skipped and not copied.
-	skip_list = [ 'DICOMDIR',
-				  'VERSION',
-				  'LOCKFILE']
+	SKIP_LIST = ['DICOMDIR',
+				 'VERSION',
+				 'LOCKFILE'
+				]
 
-	# List of tags to raise warnings for if they are not present in loaded DCM files.
-	dcm_tag_checklist       = [ 'PatientID',
-								'PatientName',
-								'AccessionNumber',
-								'StudyInstanceUID',
-								'StudyDate' ]
+	# List of tags to raise warnings for if they are not present
+	# in the loaded DCM files.
+	DCM_TAG_CHECKLIST = ['PatientID',
+						 'PatientName',
+						 'AccessionNumber',
+						 'StudyInstanceUID',
+						 'StudyDate'
+						]
 
-
-
-	# Assign the pydicom and openpyxl objects at start.  Some pylint warning were raised when DCM was set to 'False' rather than an object
+	# Assign the pydicom and openpyxl objects at start.
+	# Some pylint warning were raised when DCM was set to 'False'
 	DCM = pydicom.Dataset()
 	XLS = openpyxl.Workbook()
 
 
-	# *****************************************************************************************************************************************
-	# *                                                                                                                                       *
-	# *                                           Start of Methods                                                                            *
-	# *                                                                                                                                       *
-	# *                                                                                                                                       *
-	# *****************************************************************************************************************************************
+	# *********************************************************************
+	# *                                                                   *
+	# *                     Start of Methods                              *
+	# *                                                                   *
+	# *                                                                   *
+	# *********************************************************************
 
 
 	def load_xls( self, xls_filename ):
 		"""
-		Loads study XLS file, and does basic checking to make sure that it is actually a valid XLS sheet with check_xls_is_valid().
+		Loads study XLS file, and does basic checking to make sure that it
+		is actually a valid XLS sheet with check_xls_is_valid().
 		Usage: study_workbook = load_study_xls( <filename> )
 		Returns: openpyxl XLS workbook object
 		"""
 		# This is a mini-__init__
-		self.global_log_level = self.loglevel_debug
+		self.GLOBAL_LOGLEVEL = self.LOGLEVEL_DEBUG
 
 		# back to the normal code
 		self.xls_UID_lookup = {}
@@ -122,10 +136,8 @@ class Study_Class( ):
 		try:
 			self.XLS = openpyxl.load_workbook( xls_filename )
 		except:
-			#self.log_message( f'load_xls: {xls_filename} failed to load.', self.loglevel_normal )
 			print(f'load_xls: {xls_filename} failed to load. FATAL ERROR')
 			exit()
-
 
 		#********************   Validity Checks go here *********************
 
@@ -146,109 +158,86 @@ class Study_Class( ):
 		if valid:
 
 			self.frontsheet = self.XLS['Front']
-			self.datasheet  = self.XLS['Data']
-			self.logsheet   = self.XLS['Log']
+			self.datasheet = self.XLS['Data']
+			self.logsheet = self.XLS['Log']
 
 			# Identify the first available log row
 			self.find_first_available_log_row()
-			self.log_message( f'<study_obj>.load_xls: xlsLog_next_log_row has been set and is {self.next_log_row}', self.loglevel_debug )
 
 			# Load the existing UIDs into the dict cache
-			# self.xls_UID_lookup = cache_existing_xls_UIDs( new_workbook )
 			self.cache_existing_xls_UIDs( )
-
 
 			# Identify row of the first available new studyID
 			self.next_studyID_row = self.first_available_studyID_row( )
 
-
-			self.log_message( f'load_xls: Complete OK. loaded {xls_filename} OK', self.loglevel_debug )
+			self.log( f'load_xls: Complete OK. loaded {xls_filename} OK',
+			         self.LOGLEVEL_DEBUG
+					)
 
 			return True
 
 		else:
-			#self.log_message( f'load_xls: {xls_filename} is not valid: {validity_msg}', self.loglevel_normal )
-			print(f'load_xls: {xls_filename} failed to pass the checks. Did you edit it? FATAL ERROR')
+			print(f'load_xls: {xls_filename} failed checks. FATAL ERROR')
 			return False
 
 
-# -----------------------> Create new 'blank' XLS from scratch. Does not load a blank XLS to do this.
+# Create new 'blank' XLS from scratch. Does not load a blank XLS to do this.
 
 	def new_XLS( self ):
 		self.XLS = openpyxl.Workbook()
-		self.xls_repopulate_attribs()
+		self.xls_populate_attribs()
 
 
-
-	def xls_repopulate_attribs( self ):
+	def xls_populate_attribs( self ):
+		'''Used in Init_Study.py after creating a new [blank] XLS file object
+		Populate things like shortcuts to the workbook sheets etc.
+		This is essentially moved from the load_xls method.
 		'''
-		Used in Init_Study.py after creating a new [blank] XLS file object
-		Re-apply the basic attributes - populating things like shortcuts to the workbook sheets etc.
-		This is essentially copied from the load_xls method.
-		Re-opening and running the validation (in the .load_xls() method) should be done separately once the XLS has been saved.
-		'''
-
 		self.frontsheet = self.XLS['Front']
-		self.datasheet  = self.XLS['Data']
-		self.logsheet   = self.XLS['Log']
+		self.datasheet = self.XLS['Data']
+		self.logsheet = self.XLS['Log']
 
-		# Identify the first available log row
 		self.find_first_available_log_row()
-
-		# Load the existing UIDs into the dict cache
-		# self.xls_UID_lookup = cache_existing_xls_UIDs( new_workbook )
 		self.cache_existing_xls_UIDs( )
-
-		# Identify row of the first available new studyID
 		self.next_studyID_row = self.first_available_studyID_row( )
 
-		self.log_message( f'xls_repopulate_attribs: Completed OK.', self.loglevel_debug )
+		self.log( f'xls_repopulate_attribs: Complete.', self.LOGLEVEL_DEBUG )
 
 
-
-
-
-
-
-
-
-
-
-
-
-	def write_xls_to_disc ( self, filename ):
-
+	def write_xls_to_disc(self, filename):
+		'''Alternative route to the openpyxl .save method
+		'''
 		self.XLS.save( filename )
 
 
-
-
-	def cache_existing_xls_UIDs ( self ):
-		"""
-		Identifies each stored study UID and caches it and the corresponding row number in a dict\n
-		Returns the absolute row number - not relative, so starts at 2 (as does the data) and ends at total_studyIDs + 1\n
-		Usage: Study_Class.cache_existing_xls_UIDs ( )\n
+	def cache_existing_xls_UIDs(self):
+		"""Identifies each stored study UID and caches both it and its row number
+		in a dictionary object.\n
+		Returns the absolute row number - not relative
+		-so starts at 2 (as does the data) and ends at total_studyIDs + 1\n
+		Usage: <obj>.cache_existing_xls_UIDs()\n
 		Returns:  True (no probs), False (error)  
 		"""
-		self.log_message( '<obj>.cache_existing_xls_UIDs(): Started.', self.loglevel_debug )
+		self.log('.cache_existing_xls_UIDs(): Started.', self.LOGLEVEL_DEBUG )
 		
+		# Probably unnecessary re-definition
 		self.xls_UID_lookup = {}
 
 		row = 2
-		max_row = int( self.frontsheet[ self.xlsFront_number_of_study_IDs_cell ].value ) + 1  # +1 as the data-containing rows start at row 2, not 1
+		max_row = int( self.frontsheet[ self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL ].value ) + 1  # +1 as the data-containing rows start at row 2, not 1
 
-		check_ptID      = self.datasheet[ self.xlsData_patient_ID + str(row) ].value
-		check_studyID   = self.datasheet[ self.xlsData_study_IDs  + str(row) ].value
-		check_study_UID = self.datasheet[ self.xlsData_study_UID  + str(row) ].value
+		check_ptID      = self.datasheet[ self.XLSDATA_PATIENTID + str(row) ].value
+		check_studyID   = self.datasheet[ self.XLSDATA_STUDYIDS  + str(row) ].value
+		check_study_UID = self.datasheet[ self.XLSDATA_STUDYUID  + str(row) ].value
 
 		while (check_studyID != None ) and (check_ptID != None ) and (row <= max_row ) and (check_study_UID != None ):
 			self.xls_UID_lookup[ check_study_UID ] = row
 			row += 1
-			check_ptID      = self.datasheet[ self.xlsData_patient_ID + str(row) ].value
-			check_studyID   = self.datasheet[ self.xlsData_study_IDs  + str(row) ].value
-			check_study_UID = self.datasheet[ self.xlsData_study_UID  + str(row) ].value
+			check_ptID      = self.datasheet[ self.XLSDATA_PATIENTID + str(row) ].value
+			check_studyID   = self.datasheet[ self.XLSDATA_STUDYIDS  + str(row) ].value
+			check_study_UID = self.datasheet[ self.XLSDATA_STUDYUID  + str(row) ].value
 
-		self.log_message( f'self.cache_existing_xls_UIDs: Completed OK. Found&cached {len(self.xls_UID_lookup)} existing UIDs.  Final row={row}', self.loglevel_high )
+		self.log( f'self.cache_existing_xls_UIDs: Completed OK. Found&cached {len(self.xls_UID_lookup)} existing UIDs.  Final row={row}', self.LOGLEVEL_HIGH )
 		return True
 
 
@@ -259,24 +248,21 @@ class Study_Class( ):
 		Usage: Study_Class.find_first_available_log_row( )\n
 		Returns: Int row number
 		'''
-		#self.log_message( f'find_first_available_log_row: Starting', self.loglevel_debug )
-		
-		row = 2   # This is the first logging row
+		row = 2   # This is the first possible logging row
 
-		check_log_activitymsg = self.logsheet[ self.xlsLog_activity + str(row) ].value
+		log_check = self.logsheet[ self.XLSLOG_ACTIVITY + str(row) ].value
 	
-		# if there is an activity msg (ie != None) then go to the next row and check again
-		
-		print(f'<study_obj>.find_first_available_log_row: start row = {row}')
-
-		while (check_log_activitymsg != None ):
-			#print(f'row {row} != None. Incrementing. Contains:\"{check_log_activitymsg}\"')
+		# if there is an activity msg (ie != None) 
+		# then go to the next row and check again
+		while (log_check is not None ):
 			row += 1
-			check_log_activitymsg = self.logsheet[ self.xlsLog_activity + str(row) ].value
-
+			log_check = self.logsheet[ self.XLSLOG_ACTIVITY + str(row) ].value
 
 		self.next_log_row = row
-		self.log_message( f'find_first_available_log_row: Completed. next_log_row = {self.next_log_row}', self.loglevel_debug )
+		self.log(f'find_first_available_log_row: row={self.next_log_row}',
+		         self.LOGLEVEL_DEBUG
+				)
+
 		return row
 
 
@@ -284,7 +270,7 @@ class Study_Class( ):
 
 	#------------------------------------------------------------------------------------------------------
 
-	def log_message( self, message_str, msg_log_level = loglevel_normal ):
+	def log( self, message_str, msg_log_level=LOGLEVEL_NORMAL ):
 		'''
 		This is supposed to add a new line to the log page in the XLS file, describing a change.
 		Perhaps this is a good place to set log level...
@@ -292,20 +278,20 @@ class Study_Class( ):
 		'''
 		# Only logs messages that are at or below the global log level. 
 		# So debug msgs will bot be logged in high or normal logging
-		if ( msg_log_level > self.global_log_level ):
+		if ( msg_log_level > self.GLOBAL_LOGLEVEL ):
 			return False
 
 		# log date, time, activity, user, computer
 		row_text = str( self.next_log_row )
 		
-		self.logsheet[ self.xlsLog_activity + row_text ] = f'({ self.loglevel_txt[ msg_log_level ] }): { message_str }'
+		self.logsheet[ self.XLSLOG_ACTIVITY + row_text ] = f'({ self.LOGLEVEL_TXT[ msg_log_level ] }): { message_str }'
 
 		dateobject = datetime.now()
 
-		self.logsheet[ self.xlsLog_date     + row_text ] = dateobject.strftime('%d-%m-%Y') # date  
-		self.logsheet[ self.xlsLog_time     + row_text ] = dateobject.strftime('%H:%M:%S') # timenow
-		self.logsheet[ self.xlsLog_user     + row_text ] = self.log_username               # username
-		self.logsheet[ self.xlsLog_computer + row_text ] = self.log_computername           # compname
+		self.logsheet[ self.XLSLOG_DATE     + row_text ] = dateobject.strftime('%d-%m-%Y') # date  
+		self.logsheet[ self.XLSLOG_TIME     + row_text ] = dateobject.strftime('%H:%M:%S') # timenow
+		self.logsheet[ self.XLSLOG_USER     + row_text ] = self.log_username               # username
+		self.logsheet[ self.XLSLOG_COMPUTER + row_text ] = self.log_computername           # compname
 
 		# Finally increment the Log row pointer
 		self.next_log_row += 1
@@ -372,15 +358,15 @@ class Study_Class( ):
 		"""
 
 		row = 2
-		max_row = self.frontsheet[ self.xlsFront_number_of_study_IDs_cell ].value + 1  # +1 as the data-containing rows start at row 2, not 1
+		max_row = self.frontsheet[ self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL ].value + 1  # +1 as the data-containing rows start at row 2, not 1
 
-		check_ptID    = self.datasheet[ self.xlsData_patient_ID + str(row)].value
-		check_studyID = self.datasheet[ self.xlsData_study_IDs  + str(row)].value
+		check_ptID    = self.datasheet[ self.XLSDATA_PATIENTID + str(row)].value
+		check_studyID = self.datasheet[ self.XLSDATA_STUDYIDS  + str(row)].value
 	
 		while (check_studyID != None ) and (check_ptID != None ) and (row <= max_row ):
 			row += 1
-			check_ptID    = self.datasheet[ self.xlsData_patient_ID + str(row)].value
-			check_studyID = self.datasheet[ self.xlsData_study_IDs  + str(row)].value
+			check_ptID    = self.datasheet[ self.XLSDATA_PATIENTID + str(row)].value
+			check_studyID = self.datasheet[ self.XLSDATA_STUDYIDS  + str(row)].value
 
 		return row
 
@@ -420,29 +406,29 @@ class Study_Class( ):
 		
 		'''
 		
-		self.log_message( 'running: assign_next_free_studyID()', self.loglevel_debug )
+		self.log( 'running: assign_next_free_studyID()', self.LOGLEVEL_DEBUG )
 
 		# If this is the 1st time running then do this
 		if self.next_studyID_row == 0:
 			self.next_studyID_row = self.first_available_studyID_row( )
 		
 
-		new_studyID    = self.datasheet[ self.xlsData_study_IDs + str( self.next_studyID_row ) ].value
+		new_studyID    = self.datasheet[ self.XLSDATA_STUDYIDS + str( self.next_studyID_row ) ].value
 		new_UID        = self.DCM.StudyInstanceUID
-		no_of_studyIDs = self.frontsheet[ self.xlsFront_number_of_study_IDs_cell ].value
+		no_of_studyIDs = self.frontsheet[ self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL ].value
 
 
 		# Check to see if we have exceeded available StudyIDs
 		if self.next_studyID_row > ( no_of_studyIDs + 1) and new_studyID == None:
 			#This will happen if we have run out of possible studyIDs
 			# Actually, this 'else' statement is redundant but makes the code clearer to me.
-			self.log_message( '<obj>.assign_next_free_studyID: Run out of Study IDs in the xls file!!!', self.loglevel_normal)
+			self.log( '<obj>.assign_next_free_studyID: Run out of Study IDs in the xls file!!!', self.LOGLEVEL_NORMAL)
 			return False
 		elif self.next_studyID_row > ( no_of_studyIDs + 1) and new_studyID != None:
 			# there is a mismatch- my code thinks we have exceeded the number of used studyIDs
 			# However, new_studyID != None -ie the datacell in the XLS is not empty. We presume this cell contains a valid studyID...
 			# A warning is logged however.
-			self.log_message(f'<>.assign_next_free_studyID: WARNING -- next_studyID_row ({self.next_studyID_row}) is more than no_of_studyIDs ({no_of_studyIDs}) but XLScell is non-empty ({new_studyID}). Assuming it contains a valid studyID', self.loglevel_normal)
+			self.log(f'<>.assign_next_free_studyID: WARNING -- next_studyID_row ({self.next_studyID_row}) is more than no_of_studyIDs ({no_of_studyIDs}) but XLScell is non-empty ({new_studyID}). Assuming it contains a valid studyID', self.LOGLEVEL_NORMAL)
 
 
 		#next_study_ID_generator = studytools.next_XLSrow_gen( starting_row, no_of_studyIDs, self.datasheet, self.xlsData_study_IDs )
@@ -452,25 +438,25 @@ class Study_Class( ):
 		dateobject = datetime.now()
 		current_row_str = str( self.next_studyID_row )
 
-		self.datasheet[ self.xlsData_date_added        +  current_row_str ] = str( dateobject.strftime('%d-%m-%Y') )
-		self.datasheet[ self.xlsData_time_added        +  current_row_str ] = str( dateobject.strftime('%H:%M:%S') )
+		self.datasheet[ self.XLSDATA_DATEADDED        +  current_row_str ] = str( dateobject.strftime('%d-%m-%Y') )
+		self.datasheet[ self.XLSDATA_TIMEADDED        +  current_row_str ] = str( dateobject.strftime('%H:%M:%S') )
 
-		self.datasheet[ self.xlsData_patient_ID        +  current_row_str ] = str( self.try_dcm_attrib( 'PatientID',        'Nil' ) )
-		self.datasheet[ self.xlsData_patient_name      +  current_row_str ] = str( self.try_dcm_attrib( 'PatientName',      'Nil' ) )
+		self.datasheet[ self.XLSDATA_PATIENTID        +  current_row_str ] = str( self.try_dcm_attrib( 'PatientID',        'Nil' ) )
+		self.datasheet[ self.XLSDATA_PATIENTNAME      +  current_row_str ] = str( self.try_dcm_attrib( 'PatientName',      'Nil' ) )
 	
-		self.datasheet[ self.xlsData_accession_number  +  current_row_str ] = str( self.try_dcm_attrib( 'AccessionNumber',  'Nil' ) )
-		self.datasheet[ self.xlsData_study_date        +  current_row_str ] = str( self.try_dcm_attrib( 'StudyDate',        'Nil' ) )
-		self.datasheet[ self.xlsData_study_time        +  current_row_str ] = str( self.try_dcm_attrib( 'StudyTime',        'Nil' ) )
-		self.datasheet[ self.xlsData_study_UID         +  current_row_str ] = str( self.try_dcm_attrib( 'StudyInstanceUID', 'Nil' ) )
-		self.datasheet[ self.xlsData_study_description +  current_row_str ] = str( self.try_dcm_attrib( 'StudyDescription', 'Nil' ) )
+		self.datasheet[ self.XLSDATA_ACCESSIONNUMBER  +  current_row_str ] = str( self.try_dcm_attrib( 'AccessionNumber',  'Nil' ) )
+		self.datasheet[ self.XLSDATA_STUDYDATE        +  current_row_str ] = str( self.try_dcm_attrib( 'StudyDate',        'Nil' ) )
+		self.datasheet[ self.XLSDATA_STUDYTIME        +  current_row_str ] = str( self.try_dcm_attrib( 'StudyTime',        'Nil' ) )
+		self.datasheet[ self.XLSDATA_STUDYUID         +  current_row_str ] = str( self.try_dcm_attrib( 'StudyInstanceUID', 'Nil' ) )
+		self.datasheet[ self.XLSDATA_STUDYDESCRIPTION +  current_row_str ] = str( self.try_dcm_attrib( 'StudyDescription', 'Nil' ) )
 		
 		# insert Logging message(s) here. Only 1 will be sent- depending on global_log_level
-		if self.log_message( 'running: assign_next_free_studyID() in generator loop', self.loglevel_debug ):
+		if self.log( 'running: assign_next_free_studyID() in generator loop', self.LOGLEVEL_DEBUG ):
 			pass
-		elif self.log_message( f'Assigned { new_studyID } to { self.try_dcm_attrib(  "PatientID", "No_ID" ) }', self.loglevel_high ):
+		elif self.log( f'Assigned { new_studyID } to { self.try_dcm_attrib(  "PatientID", "No_ID" ) }', self.LOGLEVEL_HIGH ):
 			pass
 		else:
-			self.log_message( f'Assigned new StudyID to {new_UID}', self.loglevel_normal )
+			self.log( f'Assigned new StudyID to {new_UID}', self.LOGLEVEL_NORMAL )
 
 
 		# Update the dict_cache.  This is a hack. Better to use in a class probably.
@@ -569,39 +555,39 @@ class Study_Class( ):
 
 		# Col A is the list of titles. Text info is in col B.
 		self.frontsheet['A1']                                                     = 'Front Page'            
-		self.frontsheet['A' + str( self.xlsFront_study_title_cell[-1] ) ]         = 'Study Title:'          # data held in xlsFront_study_title_cell
-		self.frontsheet['A' + str( self.xlsFront_PI_cell[-1] )          ]         = 'Primary Investigator:' # data held in xlsFront_PI_cell
-		self.frontsheet['A' + str( self.xlsFront_number_of_study_IDs_cell[-1] ) ] = 'No of Study IDs'       # data held in xlsFront_number_of_study_IDs_cell
-		self.frontsheet['A' + str( self.xlsFront_IRB_code_cell[-1] )    ]         = 'Study IRB Code'        # data held in xlsFront_IRB_code_cell
+		self.frontsheet['A' + str( self.XLSFRONT_STUDYTITLE_CELL[-1] ) ]         = 'Study Title:'          # data held in xlsFront_study_title_cell
+		self.frontsheet['A' + str( self.XLSFRONT_PI_CELL[-1] )          ]         = 'Primary Investigator:' # data held in xlsFront_PI_cell
+		self.frontsheet['A' + str( self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL[-1] ) ] = 'No of Study IDs'       # data held in xlsFront_number_of_study_IDs_cell
+		self.frontsheet['A' + str( self.XLSFRONT_IRB_CODE_CELL[-1] )    ]         = 'Study IRB Code'        # data held in xlsFront_IRB_code_cell
 
-		self.frontsheet[ self.xlsFront_study_title_cell         ] = new_study_title
-		self.frontsheet[ self.xlsFront_PI_cell                  ] = new_primary_investigator
-		self.frontsheet[ self.xlsFront_number_of_study_IDs_cell ] = new_number_of_study_IDs
-		self.frontsheet[ self.xlsFront_IRB_code_cell            ] = 'IRBcode1234'	
+		self.frontsheet[ self.XLSFRONT_STUDYTITLE_CELL         ] = new_study_title
+		self.frontsheet[ self.XLSFRONT_PI_CELL                  ] = new_primary_investigator
+		self.frontsheet[ self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL ] = new_number_of_study_IDs
+		self.frontsheet[ self.XLSFRONT_IRB_CODE_CELL            ] = 'IRBcode1234'	
 
 		# Row 1 is the column title row
 		self.datasheet['A1']  = 'Data Page'
-		self.datasheet[ self.xlsData_study_IDs  + '1']  = 'Study IDs'
-		self.datasheet[ self.xlsData_date_added + '1']  = 'Date Added'
-		self.datasheet[ self.xlsData_time_added + '1']  = 'Time Added'
+		self.datasheet[ self.XLSDATA_STUDYIDS  + '1']  = 'Study IDs'
+		self.datasheet[ self.XLSDATA_DATEADDED + '1']  = 'Date Added'
+		self.datasheet[ self.XLSDATA_TIMEADDED + '1']  = 'Time Added'
 
-		self.datasheet[ self.xlsData_patient_name  + '1'] = 'Patient Name'
+		self.datasheet[ self.XLSDATA_PATIENTNAME  + '1'] = 'Patient Name'
 		#self.datasheet[ self.xlsData_patient_firstname + '1'] = 'First Name'
 
-		self.datasheet[ self.xlsData_patient_ID        + '1'] = 'Patient ID'
-		self.datasheet[ self.xlsData_accession_number  + '1'] = 'Accession No.'
-		self.datasheet[ self.xlsData_study_date        + '1'] = 'Study Date'
-		self.datasheet[ self.xlsData_study_time        + '1'] = 'Study Time'
-		self.datasheet[ self.xlsData_study_UID         + '1'] = 'Study UID'
-		self.datasheet[ self.xlsData_study_description + '1'] = 'Study Description'
+		self.datasheet[ self.XLSDATA_PATIENTID        + '1'] = 'Patient ID'
+		self.datasheet[ self.XLSDATA_ACCESSIONNUMBER  + '1'] = 'Accession No.'
+		self.datasheet[ self.XLSDATA_STUDYDATE        + '1'] = 'Study Date'
+		self.datasheet[ self.XLSDATA_STUDYTIME        + '1'] = 'Study Time'
+		self.datasheet[ self.XLSDATA_STUDYUID         + '1'] = 'Study UID'
+		self.datasheet[ self.XLSDATA_STUDYDESCRIPTION + '1'] = 'Study Description'
 
 		self.logsheet['A1']   = 'Log Page'
 
-		self.logsheet[ self.xlsLog_date + '1']   = 'Date'
-		self.logsheet[ self.xlsLog_time + '1']   = 'Time'
-		self.logsheet[ self.xlsLog_activity + '1']   = 'Log Activity'
-		self.logsheet[ self.xlsLog_user + '1']   = 'User'
-		self.logsheet[ self.xlsLog_computer + '1']   = 'Computer'
+		self.logsheet[ self.XLSLOG_DATE + '1']   = 'Date'
+		self.logsheet[ self.XLSLOG_TIME + '1']   = 'Time'
+		self.logsheet[ self.XLSLOG_ACTIVITY + '1']   = 'Log Activity'
+		self.logsheet[ self.XLSLOG_USER + '1']   = 'User'
+		self.logsheet[ self.XLSLOG_COMPUTER + '1']   = 'Computer'
 
 		
 	#------------------------------------------------------------------------------------------------------

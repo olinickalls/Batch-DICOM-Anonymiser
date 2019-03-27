@@ -77,7 +77,7 @@ if len(file_paths) == 0:
 	print('\t\t-Change the patient name in all DICOM files to \'patient-zero\'.')
 	exit()
 
-study.log_message( '\n' + str(len(file_paths)) + ' line(s) received from cmd line', study.loglevel_high) # print no. of lines received
+study.log( '\n' + str(len(file_paths)) + ' line(s) received from cmd line', study.LOGLEVEL_HIGH) # print no. of lines received
 
 # Iterate through all lines received from the cmd line and print them to screen
 line_count = 1
@@ -118,7 +118,7 @@ except:
 
 #--------------------> Log start of new session
 
-study.log_message( f'Launched: Examining {str(file_paths)}', study.loglevel_normal )
+study.log( f'Launched: Examining {str(file_paths)}', study.LOGLEVEL_NORMAL )
 
 
 #--------------------> Process multiple directories
@@ -143,8 +143,8 @@ for rootDir in file_paths:
 	
 	print(f'rootDir = {rootDir}')
 	
-	if study.frontsheet[ study.xlsFront_IRB_code_cell ].value:
-		AnonName = study.frontsheet[ study.xlsFront_IRB_code_cell ].value
+	if study.frontsheet[ study.XLSFRONT_IRB_CODE_CELL ].value:
+		AnonName = study.frontsheet[ study.XLSFRONT_IRB_CODE_CELL ].value
 	else:
 		# This portion is old and may be deleted.
 		# This takes the characters to the right of the last '\\' in the path
@@ -209,7 +209,7 @@ for rootDir in file_paths:
 			print( f'\t{fname}', end='', flush=True )
 
 			# Skip certain files based on filename. skip_list[] contains the list.  Do not copy. Do no try to read.
-			if fname in study.skip_list:
+			if fname in study.SKIP_LIST:
 				skipped_dcm_filenames.append( fname )
 				continue
 
@@ -224,7 +224,7 @@ for rootDir in file_paths:
 				# Run test against the list study.dcm_tag_checklist
 				load_warning = ''
 				
-				for tag in study.dcm_tag_checklist:
+				for tag in study.DCM_TAG_CHECKLIST:
 					if study.try_dcm_attrib( tag, '-blank-') == '-blank-':
 						load_warning += ( tag + ' ' )
 
@@ -264,7 +264,7 @@ for rootDir in file_paths:
 				if study.test_study_UID in study.xls_UID_lookup:
 					# ie. if the study UID is known and is in the UID cache (possible re-anonymisation)
 					#AnonID = studytools.get_old_study_attrib( study.XLS, study.xls_UID_lookup, study.test_study_UID, study.xlsData_study_IDs )
-					AnonID = study.get_old_study_attrib_from_UID( study.xlsData_study_IDs, study.test_study_UID )
+					AnonID = study.get_old_study_attrib_from_UID( study.XLSDATA_STUDYIDS, study.test_study_UID )
 					print(f' - Known UID, using {AnonID}')
 					#print(f'AnonID = {AnonID}')
 				else:
@@ -341,7 +341,7 @@ if len(tag_warning) > 0:
 else:
 	print('\tNone')
 
-study.log_message( f'Completed. Deidentified {all_anonok}, failed {all_anonfailed}', study.loglevel_normal )
+study.log( f'Completed. Deidentified {all_anonok}, failed {all_anonfailed}', study.LOGLEVEL_NORMAL )
 
 #studytools.write_xls_to_disc( study.XLS, study.xls_filename )
 study.write_xls_to_disc( study.xls_filename )

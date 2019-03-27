@@ -138,7 +138,7 @@ study.create_new_study( xls_Filename,
 							   number_of_study_IDs )
 
 
-study.xls_repopulate_attribs()
+study.xls_populate_attribs()
 
 
 #--------------------->  Create Study IDs  <-------------------------
@@ -228,13 +228,13 @@ print(f'{collisions} collision(s).\n\n')
 #wsData = study_wb[ 'Data' ]
 row = 2
 for ID in StudyIDs:
-	study.datasheet[ study.xlsData_study_IDs +str(row) ] = ID
+	study.datasheet[ study.XLSDATA_STUDYIDS +str(row) ] = ID
 	row += 1
 
 #----------------------> Log the creation <-----------------------
 
-study.log_message( f'New Study Created. Title: {args.title}, PI: {args.PI}', study.loglevel_normal)
-study.log_message( f'Number of studyIDs:{args.n} Prefix: \"{args.prefix}\" Format: \"{args.format}\"', study.loglevel_normal)
+study.log( f'New Study Created. Title: {args.title}, PI: {args.PI}', study.LOGLEVEL_NORMAL)
+study.log( f'Number of studyIDs:{args.n} Prefix: \"{args.prefix}\" Format: \"{args.format}\"', study.LOGLEVEL_NORMAL)
 
 #log_xls_creation( study.XLS, number_of_study_IDs, args.prefix, args.format )
 
