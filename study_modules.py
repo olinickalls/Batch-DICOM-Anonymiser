@@ -224,13 +224,15 @@ class Study_Class( ):
 		self.xls_UID_lookup = {}
 
 		row = 2
-		max_row = int( self.frontsheet[ self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL ].value ) + 1  # +1 as the data-containing rows start at row 2, not 1
+		max_row = self.frontsheet[ self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL ].value + 1
+		# +1 as the data-containing rows start at row 2, not 1
+		max_row = int( max_row )
 
-		check_ptID      = self.datasheet[ self.XLSDATA_PATIENTID + str(row) ].value
-		check_studyID   = self.datasheet[ self.XLSDATA_STUDYIDS  + str(row) ].value
-		check_study_UID = self.datasheet[ self.XLSDATA_STUDYUID  + str(row) ].value
+		check_ptID = self.datasheet[self.XLSDATA_PATIENTID + str(row)].value
+		check_studyID = self.datasheet[self.XLSDATA_STUDYIDS + str(row)].value
+		check_study_UID = self.datasheet[self.XLSDATA_STUDYUID + str(row)].value
 
-		while (check_studyID != None ) and (check_ptID != None ) and (row <= max_row ) and (check_study_UID != None ):
+		while (check_studyID != None ) and (check_ptID != None ) and (row <= max_row ):
 			self.xls_UID_lookup[ check_study_UID ] = row
 			row += 1
 			check_ptID      = self.datasheet[ self.XLSDATA_PATIENTID + str(row) ].value

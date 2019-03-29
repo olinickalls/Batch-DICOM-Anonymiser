@@ -19,39 +19,39 @@ import study_modules
 
 
 parser = argparse.ArgumentParser(
-	                 description='Create a XLS deidentification file for your study.')
+					description='Create a XLS deidentification file for your study.')
 
 parser.add_argument('filename', metavar='<filename>', 
-                     type=str, 
-					 default="template",
-	                 help='Template <filename>.xlsx to create (no spaces allowed)')
+					type=str, 
+					default="template",
+					help='Template <filename>.xlsx to create (no spaces allowed)')
 
 parser.add_argument('-title', metavar='<Study Title>', 
-	                 type=str, 
-	                 default='Default Study Title',
-	                 help='Title of Study')
+					type=str, 
+					default='Default Study Title',
+					help='Title of Study')
 
 parser.add_argument('-PI', metavar='<PI name>', 
-	                 type=str, 
-	                 default='<PI name here>', 
-                     help='Primary Investigator (PI) name')
+					type=str, 
+					default='<PI name here>', 
+					help='Primary Investigator (PI) name')
 
 parser.add_argument('-n', metavar='<No. of StudyIDs>', 
-	                 type=int, 
-	                 default=1000, 
-                     help='Number of Study IDs to create (default = 1000)')
+					type=int, 
+					default=1000, 
+					help='Number of Study IDs to create (default = 1000)')
 
 parser.add_argument('-format', 
-	                 metavar='<SID format>', 
-	                 type=str, 
-	                 default='uudddd',
-	                 help='Study ID Format (default = \"uudddd\") (U)pper, (L)ower, (C)har of either case, (D)igit')
+					metavar='<SID format>', 
+					type=str, 
+					default='uudddd',
+					help='Study ID Format (default = \"uudddd\") (U)pper, (L)ower, (C)har of either case, (D)igit')
 
 parser.add_argument('-prefix', 
-	                 metavar='<StudyID prefix>', 
-	                 type=str, 
-	                 default='',
-	                 help='Study ID Prefix (default = blank)')
+					metavar='<StudyID prefix>', 
+					type=str, 
+					default='',
+					help='Study ID Prefix (default = blank)')
 
 args = parser.parse_args()
 
@@ -133,9 +133,9 @@ study = study_modules.Study_Class()
 
 
 study.create_new_study( xls_Filename,
-                               args.title,
-	    					   args.PI,
-							   number_of_study_IDs )
+							args.title,
+							args.PI,
+							number_of_study_IDs )
 
 
 study.xls_populate_attribs()
@@ -170,12 +170,12 @@ else:
 print(f'progressintervals = {progressintervals}')
 
 pb = ProgressBar(total=progressintervals,
-	             prefix='Generating Study IDs', 
-	             suffix='Complete', 
-	             decimals=0, 
-	             length=progressintervals, 
-	             fill='X', 
-	             zfill='-')
+				prefix='Generating Study IDs', 
+				suffix='Complete', 
+				decimals=0, 
+				length=progressintervals, 
+				fill='X', 
+				zfill='-')
 ProgressStep = int( number_of_study_IDs / progressintervals )
 Next_Progress_Step = 0
 collisions = 0
@@ -238,7 +238,6 @@ study.log( f'Number of studyIDs:{args.n} Prefix: \"{args.prefix}\" Format: \"{ar
 
 #log_xls_creation( study.XLS, number_of_study_IDs, args.prefix, args.format )
 
-
 #--------------------->  Save XLSX file  <-------------------------
 
 print(f'Saving \"{xls_Filename}\"...')
@@ -252,3 +251,4 @@ else:
 
 print(f'\nProcess complete. Created {args.n} studyIDs of format ')
 print(f'\"{args.prefix}\"+\"{args.format}\" and saved to \"{xls_Filename}\"')
+
