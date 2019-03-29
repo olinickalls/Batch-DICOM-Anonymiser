@@ -1,4 +1,9 @@
 #dcmtools.py
+'''Just some tools that I use sporadically
+Mainly for troubleshooting anonymised datasets
+
+Needs PEP 8 compliance work
+'''
 
 import pydicom
 from study_modules import *
@@ -7,8 +12,8 @@ from study_modules import *
 
 def dcm_qload( filename, path = "" ):
     ds= pydicom.filereader.dcmread( path + filename, force= True)
-
     return ds
+
 
 def save( dcm_object, filename, path="" ):
     dcm_object.save_as( path + filename, write_like_original = True)
