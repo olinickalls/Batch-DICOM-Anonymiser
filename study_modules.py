@@ -673,9 +673,10 @@ def number_possible_IDs( format ):
 
 
 
-def create_rnd_studyID( format = 'lldddd', prefix=''):
+def create_rnd_studyID( format = 'lldddd', prefix='', suffix=''):
 
 	# c = alphabetical char, d = digit
+	# u = upper, l = lower
 
 	# c can be anything from 'a' to 'Z'
 	# d can be 0-9
@@ -707,6 +708,8 @@ def create_rnd_studyID( format = 'lldddd', prefix=''):
 
 		elif letter =='d': #if is digit
 			newID += secure_random.choice(digitlist)
+
+	newID += suffix
 
 	return newID
 
