@@ -22,59 +22,69 @@ Planned enhancements:
 -?encrypt / scramble log output?
 '''
 
-import os         # for os.walk() primarily
-import sys        # cmd line arguments
-import pydicom    # DICOM - obviously...
+import os         
+import sys        
+import pydicom    # DICOM file tools
 import shutil     # used for just file copying.
 import openpyxl   # For excel file access
 import study_modules     # Class re-write of BA Modules.py and studytools.py
 
+from inspect import currentframe, getframeinfo
+from pathlib import Path
+
+filename = getframeinfo(currentframe()).filename
+parent = Path(filename).resolve().parent
+
+print( f'CWD: {os.getcwd()}')
+print( f'.py file path: {parent}  {filename}')
+
+os.chdir( parent )
+
 # ---------------------------------------------------------------------------
+##    Consider argparse to allow better CLI
+##    Include CLI options such as xlsfilename, log level...
+
 study = study_modules.Study_Class()
-
-# ---------------------------------------------------------------------------
-##    Work In Progress:
-##    Need to convert this to argparse.
-##    Include cmd line options such as xlsfilename, log level...
-
 study.xls_filename = 'test_file.xlsx'  # Default
 
+print('Formatting input files...\n')
+file_paths = sys.argv[1:]  # remove the first argument-the name of this script
 
-print('Formatting input files...')
-
-file_paths = sys.argv[1:]  # the first argument is the script itself
-
-if len( file_paths ) < 1:  # Default
+#----> Remove this for prod. This is here for VSCode debug as I don't know how to set up CLI arguments...
+if len( file_paths ) < 1:
 	file_paths = [ 'C:\\Users\\oliver\\Documents\\pycode\\Batch-DICOM-Anonymiser\\sample_1' ]
 
-
 if len(file_paths) == 0:
-	print('No input found. Defaulting to test string.')
-	print('No cmd line arguments found.\n\nSyntax:\n\tBatch-Anonymiser <dir1> [<dir2> <dir3>...]')
+	print('No cmd line arguments found.')
+	print('\nSyntax:')
+	print('\tBatch-Deidentifier <dir1> [<dir2> <dir3>...]')
 	print('\n\twhere <dir_> is the base directory of DICOM files')
-	print('BatchAnonymiser will change the patient name to the \'base\' directory name.')
+	print('Batch-Deidentifier will change the patient name to the IRB code.')
 	print('e.g. BatchAnonymiser c:\\myfiles\\patient-zero')
 	print('\n\t will:')
-	print('\t\t-Duplicate the directory tree into c:\\myfiles\\patient-zero-anon (including non-DICOM files and empty directories)')
-	print('\t\t-Anonymise all DICOM files')
-	print('\t\t-Change the patient name in all DICOM files to \'patient-zero\'.')
+	print('\t\t-Duplicate the directory tree into c:\\myfiles\\patient-zero-anon')
+	print('\t\t\texcluding non-DICOM files but including empty directories')
+	print('\t\t-Deidentify all DICOM files according to the study XLSX file')
+	print('\t\t-Change the patient name in all DICOM files to the IRB Code')
+	print('\t\t\tstrip out patient identifiers and partial identifiers,')
+	print('\t\t\tand more in a fairly aggressive manner.')
+	print('\t\t\tand then apply a pre-generated (random) studyID')
 	exit()
-
-print('\n')
 
 #--------------------> Open XLSX to read/write
 study.load_xls( study.xls_filename )
 
-if study.XLS == False:
+if not study.XLS:
 	print(f'Fatal Error: Unable to open file {study.xls_filename}')
 	exit()
-
-print(f'Loaded XLS. Found {len( study.xls_UID_lookup )} previously deidentified studie(s).')
+print('Loaded XLS.')
+print(f'\tFound {len(study.xls_UID_lookup)} deidentified studie(s).')
 
 try:
 	study.XLS.save( study.xls_filename )
 except:
-	print(f'{study.xls_filename} save permission denied. Is the file open in excel?.\nPlease unlock and try again.')
+	print(f'{study.xls_filename} save permission denied.')
+	print('Is the file open in excel?.\nPlease unlock and try again.')
 	raise
 
 #--------------------> Log start of new session
@@ -88,14 +98,12 @@ all_copyOK = 0
 all_copyfailed = 0
 all_anonok = 0
 all_anonfailed = 0
-
 skipped_dcm_filenames = []
 not_DCM_filenames = []
 tag_warning = []
 
 #loop through all the folders/files in file_paths[] 
 for rootDir in file_paths:
-	
 	print(f'rootDir = {rootDir}')
 	
 	if study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value:
@@ -138,7 +146,6 @@ for rootDir in file_paths:
 		dirNameAnon = rootDir + '-anon' + dirName[ len(rootDir): ]
 	
 		# Create the directories as we come across them.
-	
 		try: 
 			os.makedirs( dirNameAnon )
 		except OSError:
@@ -146,7 +153,7 @@ for rootDir in file_paths:
 				print(f'Fatal Error: Failed to create dir: {dirNameAnon}')
 				raise
 		else:
-			print(f'\t{dirNameAnon} created OK')
+			print(f'\n\t{dirNameAnon} created OK')
 			dir_count += 1
 
 		for fname in fileList:
@@ -155,11 +162,27 @@ for rootDir in file_paths:
 
 			print(f'\t{fname}', end='',flush=True)
 
+			# --------------- Check file before processing
+			# File in skip list?
 			if fname in study.SKIP_LIST:
 				skipped_dcm_filenames.append( fname )
+				print(' -on skiplist-')
 				continue
 
-			# Try to open each file with pydicom to validate it.
+			# Check 'fourcc' (bytes from 128 to 132) = "DICM"
+			line = ""
+			with open( testfilename, "r", encoding="Latin-1") as file:
+				file.seek(128,0)
+				line = file.read(4)
+			if line == "DICM":
+				DICOM= True
+			else:
+				DICOM = False
+				print('\tfourcc says not DICOM -skipping file-')
+				not_DCM_filenames.append(f'{fname}: fourcc failed- non-dicom')
+				continue
+
+			# ----------- Try to open with pydicom
 			try:
 				study.DCM = pydicom.filereader.dcmread( testfilename, force=True)
 				
@@ -174,8 +197,8 @@ for rootDir in file_paths:
 					tag_warning.append( f'{filename} : {load_warning}' )
 
 			except:  # If exception on loading the file is prob non-DICOM
-				print('\t-NonDICOM  -skipping file-')
-				not_DCM_filenames.append(f'{fname}: load failed- non-dicom')
+				print('\t-pydicom load failed -skipping file-')
+				not_DCM_filenames.append(f'{fname}: pydicom load failed- non-dicom')
 				continue
 
 			else:  # Do this if the file is DICOM
@@ -207,7 +230,7 @@ for rootDir in file_paths:
 				study.deidentifyDICOM(AnonName, AnonID )
 
 				# Write de-identified DICOM to disc
-				study.DCM.save_as(savefilename, write_like_original=True)
+				study.DCM.save_as(savefilename, write_like_original=False)
 
 	# Stats on exit
 	all_dir_count += dir_count

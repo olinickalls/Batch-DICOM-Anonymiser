@@ -714,7 +714,5 @@ def create_rnd_studyID( format = 'lldddd', prefix='', suffix=''):
 	return newID
 
 
-
-
 pass
 
