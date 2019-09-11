@@ -52,7 +52,7 @@ def main():
 		metavar='<SID format>', 
 		type=str, 
 		default='uudddd',
-		help='StudyID Format (default = \"uudddd\") (U)pper, (L)ower,'
+		help='StudyID Format (U)pper, (L)ower,'
 			 + ' (C)har of either case, (D)igit'
 		)
 	parser.add_argument('-prefix', 
@@ -94,6 +94,7 @@ def main():
 	number_of_study_IDs = args.n
 
 	#------------->      Create XLS workbook    <-----------------
+	#-------------> and prepopulate column headings etc <---------
 	study = study_modules.Study_Class()
 	study.create_new_study( xls_Filename,
 		args.title,
@@ -171,7 +172,7 @@ def main():
 
 			#Advance Progress Bar if reached the next threshold step
 			if IDsCreated >= Next_Landmark:
-				print(f"progress: {int( (IDsCreated / max_no_IDs) * 100 )}%")
+				print(f"progress: {int( (IDsCreated / number_of_study_IDs) * 100 )}%")
 				#pb.print_progress_bar( int(IDsCreated / ProgressStep) )
 				Next_Landmark += ProgressStep
 		else:

@@ -28,64 +28,77 @@ import pydicom    # DICOM file tools
 import shutil     # used for just file copying.
 import openpyxl   # For excel file access
 import study_modules     # Class re-write of BA Modules.py and studytools.py
-
+import argparse
+# Next 2 lines used to get filename and path info
 from inspect import currentframe, getframeinfo
 from pathlib import Path
 
+#-------------------------> INITIALISATION <---------------------------------
+parser = argparse.ArgumentParser(
+		description='Deidentify DICOM files using a .xlsx Template file.'
+		)
+parser.add_argument('-x',
+	metavar='<Study Template filename>', 
+	type=str, 
+	dest='xlsfilename',
+	default='default.xlsx',
+	help='Study Template .xlsx filename'
+	)
+parser.add_argument('-d','--debug',
+    action="store_true", 
+    default=False,
+	metavar='<debug loglevel>', 
+	dest='debug',
+	help='Debug level logs'
+	)
+parser.add_argument('dicomfiles',  # positional arg -no '-' required
+	metavar='<Directories or dicom files>', 
+	type=str, nargs='*',  # No limit to number of args expected
+	help='<filenames> and <dirnames> for deidentification'
+	)
+args = parser.parse_args()
+
+# Get script filename and path
 filename = getframeinfo(currentframe()).filename
 parent = Path(filename).resolve().parent
-
 print( f'CWD: {os.getcwd()}')
 print( f'.py file path: {parent}  {filename}')
 
+# Change working directory to the same as the script.
 os.chdir( parent )
 
 # ---------------------------------------------------------------------------
-##    Consider argparse to allow better CLI
-##    Include CLI options such as xlsfilename, log level...
-
+# Create Study_Class object
 study = study_modules.Study_Class()
-study.xls_filename = 'test_file.xlsx'  # Default
+
+# Set basic info
+# study.xls_filename = 'my_study.xlsx'
+study.xls_filename = args.xlsfilename
 
 print('Formatting input files...\n')
-file_paths = sys.argv[1:]  # remove the first argument-the name of this script
+#file_paths = sys.argv[1:]  # remove the name of this script from list
+file_paths = args.dicomfiles
 
-#----> Remove this for prod. This is here for VSCode debug as I don't know how to set up CLI arguments...
-if len( file_paths ) < 1:
-	file_paths = [ 'C:\\Users\\oliver\\Documents\\pycode\\Batch-DICOM-Anonymiser\\sample_1' ]
+# Set global log level
+if args.debug:
+	study.GLOBAL_LOGLEVEL = study.LOGLEVEL_DEBUG
+	print(f'Logging set to {study.LOGLEVEL_TXT[study.GLOBAL_LOGLEVEL]}')
+else:
+	study.GLOBAL_LOGLEVEL = study.LOGLEVEL_NORMAL
 
-if len(file_paths) == 0:
-	print('No cmd line arguments found.')
-	print('\nSyntax:')
-	print('\tBatch-Deidentifier <dir1> [<dir2> <dir3>...]')
-	print('\n\twhere <dir_> is the base directory of DICOM files')
-	print('Batch-Deidentifier will change the patient name to the IRB code.')
-	print('e.g. BatchAnonymiser c:\\myfiles\\patient-zero')
-	print('\n\t will:')
-	print('\t\t-Duplicate the directory tree into c:\\myfiles\\patient-zero-anon')
-	print('\t\t\texcluding non-DICOM files but including empty directories')
-	print('\t\t-Deidentify all DICOM files according to the study XLSX file')
-	print('\t\t-Change the patient name in all DICOM files to the IRB Code')
-	print('\t\t\tstrip out patient identifiers and partial identifiers,')
-	print('\t\t\tand more in a fairly aggressive manner.')
-	print('\t\t\tand then apply a pre-generated (random) studyID')
-	exit()
-
-#--------------------> Open XLSX to read/write
+#--------------------> Open XLSX to read/write <---------------------------
 study.load_xls( study.xls_filename )
 
+# I think this is already checked within the load_xls class method.
+'''
 if not study.XLS:
 	print(f'Fatal Error: Unable to open file {study.xls_filename}')
 	exit()
+'''
+
 print('Loaded XLS.')
 print(f'\tFound {len(study.xls_UID_lookup)} deidentified studie(s).')
 
-try:
-	study.XLS.save( study.xls_filename )
-except:
-	print(f'{study.xls_filename} save permission denied.')
-	print('Is the file open in excel?.\nPlease unlock and try again.')
-	raise
 
 #--------------------> Log start of new session
 study.log(f'Launched: Examining {str(file_paths)}', study.LOGLEVEL_NORMAL )
@@ -185,6 +198,8 @@ for rootDir in file_paths:
 			# ----------- Try to open with pydicom
 			try:
 				study.DCM = pydicom.filereader.dcmread( testfilename, force=True)
+				# Blank the preamble.
+				study.DCM.preamble = b'\x00' * 128
 				
 				load_warning = ''
 				
@@ -230,7 +245,7 @@ for rootDir in file_paths:
 				study.deidentifyDICOM(AnonName, AnonID )
 
 				# Write de-identified DICOM to disc
-				study.DCM.save_as(savefilename, write_like_original=False)
+				study.DCM.save_as(savefilename, write_like_original=True)
 
 	# Stats on exit
 	all_dir_count += dir_count
@@ -290,3 +305,23 @@ study.log( f'Completed. Deidentified {all_anonok}, failed {all_anonfailed}', stu
 #studytools.write_xls_to_disc( study.XLS, study.xls_filename )
 study.write_xls_to_disc( study.xls_filename )
 
+
+
+
+#-----------------------> Helper Functions <-----------------------------------
+
+def show_zeropath_warning():
+	print('No cmd line arguments found.')
+	print('\nSyntax:')
+	print('\tBatch-Deidentifier <dir1> [<dir2> <dir3>...]')
+	print('\n\twhere <dir_> is the base directory of DICOM files')
+	print('Batch-Deidentifier will change the patient name to the IRB code.')
+	print('e.g. BatchAnonymiser c:\\myfiles\\patient-zero')
+	print('\n\t will:')
+	print('\t\t-Duplicate the directory tree into c:\\myfiles\\patient-zero-anon')
+	print('\t\t\texcluding non-DICOM files but including empty directories')
+	print('\t\t-Deidentify all DICOM files according to the study XLSX file')
+	print('\t\t-Change the patient name in all DICOM files to the IRB Code')
+	print('\t\t\tstrip out patient identifiers and partial identifiers,')
+	print('\t\t\tand more in a fairly aggressive manner.')
+	print('\t\t\tand then apply a pre-generated (random) studyID')

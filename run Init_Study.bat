@@ -1,5 +1,5 @@
 @echo off
-python Init_Study.py -h
+rem python Init_Study.py -h
 
 
 @echo ----------------------------------------------
@@ -7,7 +7,7 @@ python Init_Study.py -h
 @echo ----------------------------------------------
 
 
-python Init_Study.py "test file" -t "study to look at stuff" -n 50 -prefix TEST- -suffix END -format ldd
+python Init_Study.py "zzztest" -t "study to look at stuff" -n 5000 -prefix TEST- -suffix END -format llddd
 
 
 
