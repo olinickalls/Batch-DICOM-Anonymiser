@@ -51,6 +51,13 @@ parser.add_argument('-d','--debug',
 	dest='debug',
 	help='Debug level logs'
 	)
+parser.add_argument('-v','--verbose',
+    action="store_true", 
+    default=False,
+	metavar='<increase verbosity>', 
+	dest='verbose',
+	help='Prints more info about activity'
+	)
 parser.add_argument('dicomfiles',  # positional arg -no '-' required
 	metavar='<Directories or dicom files>', 
 	type=str, nargs='*',  # No limit to number of args expected
@@ -88,19 +95,9 @@ else:
 
 #--------------------> Open XLSX to read/write <---------------------------
 study.load_xls( study.xls_filename )
-
-# I think this is already checked within the load_xls class method.
-'''
-if not study.XLS:
-	print(f'Fatal Error: Unable to open file {study.xls_filename}')
-	exit()
-'''
-
-print('Loaded XLS.')
 print(f'\tFound {len(study.xls_UID_lookup)} deidentified studie(s).')
 
-
-#--------------------> Log start of new session
+# Log start of new session
 study.log(f'Launched: Examining {str(file_paths)}', study.LOGLEVEL_NORMAL )
 
 #--------------------> Process multiple directories
@@ -115,10 +112,12 @@ skipped_dcm_filenames = []
 not_DCM_filenames = []
 tag_warning = []
 
-#loop through all the folders/files in file_paths[] 
+#loop through all the folders/files in file_paths[]
+# each file/path listed is set as rootDir 
 for rootDir in file_paths:
 	print(f'rootDir = {rootDir}')
 	
+	# If the IRB code is set then use that as anonymised pt name
 	if study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value:
 		AnonName = study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value
 	else:
@@ -129,7 +128,7 @@ for rootDir in file_paths:
 		# The slicing /could/ be made more readable...
 		AnonName = rootDir[ -rootDir[-1::-1].find('\\') : ] 
 
-	AnonID = 'RESEARCH'
+	AnonID = 'RESEARCH'  # not stricty necessary- is redefined later.
 	
 	dir_count = 0
 	file_count = 0
@@ -159,15 +158,8 @@ for rootDir in file_paths:
 		dirNameAnon = rootDir + '-anon' + dirName[ len(rootDir): ]
 	
 		# Create the directories as we come across them.
-		try: 
-			os.makedirs( dirNameAnon )
-		except OSError:
-			if not os.path.isdir( dirNameAnon ):
-				print(f'Fatal Error: Failed to create dir: {dirNameAnon}')
-				raise
-		else:
-			print(f'\n\t{dirNameAnon} created OK')
-			dir_count += 1
+		create_dir( dirNameAnon, verbose=True )
+		dir_count += 1  # assumed created OK (error raised if not)
 
 		for fname in fileList:
 			testfilename = f'{dirName}\\{fname}'
@@ -182,15 +174,10 @@ for rootDir in file_paths:
 				print(' -on skiplist-')
 				continue
 
+
 			# Check 'fourcc' (bytes from 128 to 132) = "DICM"
-			line = ""
-			with open( testfilename, "r", encoding="Latin-1") as file:
-				file.seek(128,0)
-				line = file.read(4)
-			if line == "DICM":
-				DICOM= True
-			else:
-				DICOM = False
+			DICOM = check_DICOM_fourCC( testfilename )
+			if not DICOM:
 				print('\tfourcc says not DICOM -skipping file-')
 				not_DCM_filenames.append(f'{fname}: fourcc failed- non-dicom')
 				continue
@@ -309,6 +296,30 @@ study.write_xls_to_disc( study.xls_filename )
 
 
 #-----------------------> Helper Functions <-----------------------------------
+
+def create_dir( dir_name, verbose=True ):
+	try: 
+		os.makedirs( dir_name )
+	except OSError:
+		if not os.path.isdir( dir_name ):
+			print(f'Fatal Error: Failed to create dir: {dir_name}')
+			raise
+	else:
+		if verbose:
+			print(f'\n\t{dirNameAnon} created OK')
+		return True
+
+def check_DICOM_fourCC( filename ):
+	with open( filename, "r", encoding="Latin-1") as file:
+		file.seek(128,0)
+		line = file.read(4)
+	if line == "DICM":
+		return True
+	else:
+		print('\tfourcc says not DICOM -skipping file-')
+		return False
+
+
 
 def show_zeropath_warning():
 	print('No cmd line arguments found.')
