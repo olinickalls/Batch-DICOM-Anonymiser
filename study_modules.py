@@ -34,6 +34,61 @@ alphalistlower = ['a','b','c','d','e','f','g','h','i','j','k','l','m','o',
 
 digitlist = [ '0','1','2','3','4','5','6','7','8','9' ]
 
+class FileStats_Class( ):
+    # Basic counters etc. for use in file stats.
+    # Keep it neat and easily dealt with by helper functions.
+    
+    # Stats for each iterated 'root' directory
+    # Needs to be reset after each root is completed.
+    dir_count = 0
+    file_count = 0
+    valid_DCM_file = 0
+    copyOK = 0
+    copyfailed = 0
+    anonok = 0
+    anonfailed = 0
+
+    # Overall stats for the whole operation
+    all_dir_count = 0
+    all_file_count = 0
+    all_valid_DCM_file = 0
+    all_copyOK = 0
+    all_copyfailed = 0
+    all_anonok = 0
+    all_anonfailed = 0
+    skipped_dcm_filenames = []
+    not_DCM_filenames = []
+    tag_warning = []
+
+    def reset_sub( self ):
+        # All values back to zero (initialised values)
+        self.dir_count = 0
+        self.file_count = 0
+        self.valid_DCM_file = 0
+        self.copyOK = 0
+        self.copyfailed = 0
+        self.anonok = 0
+        self.anonfailed = 0
+    
+    def start_subdir( self, subdirlist, filelist ):
+        self.dir_count  += len( subdirlist )
+        self.file_count += len( filelist )
+
+    def subdir_complete( self ):
+        # Nothing to do right now... ?Delete?
+        return
+    
+    def update_rootdir_complete( self ):
+        self.all_dir_count += self.dir_count
+        self.all_file_count += self.file_count
+        self.all_valid_DCM_file += self.valid_DCM_file
+        self.all_copyOK += self.copyOK
+        self.all_copyfailed += self.copyfailed
+        self.all_anonok += self.anonok
+        self.all_anonfailed += self.anonfailed
+
+
+
 
 class Study_Class( ):
     # Some constants to use in this library
@@ -165,6 +220,14 @@ class Study_Class( ):
     DCM = pydicom.Dataset()
     XLS = openpyxl.Workbook()
 
+    class CurrStudy():
+        AnonName = ""
+        AnonID = ""
+        StudyInstanceUID = ""
+
+        testfilename = ""
+        savefilename = ""
+
 
     # *********************************************************************
     # *                                                                   *
@@ -202,6 +265,8 @@ class Study_Class( ):
         self.flags_dict['CROP_US_TOPBAR_FLAG'] = self.cfgsheet[ self.CROP_US_TOPBAR_FLAG_CELL ].value
 
         print(f'Delete private flags: {self.DEL_PRIVATE_FLAG}')
+        if self.CROP_US_TOPBAR_FLAG:
+            print('Warning: US image cropping not yet implemented.')
 
         # VR based actions
         row = self.Config_Start_Row
@@ -232,6 +297,9 @@ class Study_Class( ):
             element = hex( int(self.cfgsheet[ self.Tag_Element_Col + rowstr].value, 16) )
             repvalue = str(self.cfgsheet[ self.Tag_RVal_Col + rowstr ].value)
             action = str(action)
+            # Update tag name column in config sheet
+            tagname = DicomDictionary.get( combotag( group, element ), [0,0,'** Unknown **'] )[2]  # [2] selects the tag name
+            self.cfgsheet[ self.Tag_Name_Col + rowstr ].value = tagname
             self.tag_action_list.append([
                 group,
                 element,
@@ -610,7 +678,7 @@ class Study_Class( ):
         # ----------------> NEW configurable METHOD <-----------------------
         #Callback fn for removing private tags
 
-        # enact FLAG based actions
+        # enact FLAG based actions - need to sync this with excel file
         if self.DEL_PRIVATE_FLAG:
             self.DCM.remove_private_tags()
         
@@ -635,10 +703,10 @@ class Study_Class( ):
                 old = self.DCM[group,element].value
             else:
                 old = None
+            
             if action.lower() == 'replace':
                 if [group,element] in self.DCM:
                     self.DCM[group, element].value = repvalue
-            
             elif action.lower() == 'delete':
                 if [group,element] in self.DCM:
                     del self.DCM[group,element]
@@ -650,49 +718,9 @@ class Study_Class( ):
 
 
         # ----------------> OLD METHOD <-----------------------
-
-        # print(f'deidentifyDICOM received newPtName={newPtName} \tnewPtID={newPtID} ')
-
-        self.DCM.remove_private_tags()
-        self.DCM.walk( tag_data_type_callback )
-        self.DCM.walk( del_curves_callback )
-
-
-        self.DCM.AccessionNumber = ''  
-        self.DCM.StudyID = ''           # Often contains the same data as AccessionNumber
-        self.DCM.InstitutionalDepartmentName = 'St Elsewhere Radiology'
-        self.DCM.InstitutionAddress = ''   # (0008, 0081) 
-
-        self.DCM.PatientID = newPtID   # (0008, 0020)
-        self.DCM.PatientName = newPtName   # (0008, 0010)
-        self.DCM.PatientBirthDate = ''   # (0008, 0030)
-        self.DCM.InstitutionName = 'St Elsewhere'   # (0008, 0080)
-        self.DCM.StationName = 'anon MRI Station'   # (0008, 1010)
-        self.DCM.PerformedStationName	= 'anon MRI Station'   # (0008, 0242)
-        self.DCM.PerformedLocation = 'anon MRI Station'	    # (0008, 0243)
-        self.DCM.PerformedProcedureStepStartDate = ''	 
-        self.DCM.PerformedProcedureStepStartTime = ''	 
-        self.DCM.PerformedProcedureStepEndDate = 	''
-        self.DCM.PerformedProcedureStepEndTime = ''
-        self.DCM.PerformedProcedureStepID = ''
-        self.DCM.PerformedProcedureStepDescription = ''
-        self.DCM.ScheduledProcedureStepDescription = ''
-        self.DCM.ScheduledProcedureStepID = ''
-        self.DCM.RequestedProcedureID = ''
-        self.DCM.DeviceSerialNumber = ''
-        self.DCM.PlateID = ''
-        self.DCM.DetectorDescription = ''
-        self.DCM.DetectorID = ''
-
         if 'RequestAttributeSequence' in self.DCM:
             del self.DCM.RequestAttributesSequence
             print('Removing RequestAttributesSequence tag')
-
-
-        #try:
-        #	del DCOobj.RequestAttributesSequence
-        #except Exception as e:
-        #	pass
 
     # ---------------------> Moved from Init_Study
     # should return the openpyxl workbook object 
@@ -809,8 +837,6 @@ class Study_Class( ):
 ############### END OF STUDY_CLASS DEFINITION ###################
 
 
-
-
 #---------------------------------------------------------
 #      Accessory functions related to deidentification
 #---------------------------------------------------------
@@ -832,13 +858,9 @@ def tag_data_type_callback(dataset, data_element):
 
 
 
-
 def del_curves_callback(dataset, data_element):
     if data_element.tag.group & 0xFF00 == 0x5000:
         del dataset[data_element.tag]
-
-
-
 
 
 ######################################################################
@@ -846,8 +868,6 @@ def del_curves_callback(dataset, data_element):
 #---------------------------------------------------------
 #      Accessory functions related to creating a new XLS (mostly for Init_Study.py)
 #---------------------------------------------------------
-
-
 
 
 # Console text input and return valid string 
@@ -862,6 +882,9 @@ def verify_txt_input( message = 'no argument supplied'):
     return inputtext
 
 
+# Consider embedding this into creat_rnd_studyID
+# to make sure the ode to create is not duplicated
+# or could turn into a function instead.
 def number_possible_IDs( format ):
     format = format.lower().strip()
 
