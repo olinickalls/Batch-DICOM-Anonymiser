@@ -717,11 +717,6 @@ class Study_Class( ):
                 new = None
 
 
-        # ----------------> OLD METHOD <-----------------------
-        if 'RequestAttributeSequence' in self.DCM:
-            del self.DCM.RequestAttributesSequence
-            print('Removing RequestAttributesSequence tag')
-
     # ---------------------> Moved from Init_Study
     # should return the openpyxl workbook object 
     def create_new_study( 	self, 
