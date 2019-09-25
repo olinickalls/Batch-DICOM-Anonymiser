@@ -16,6 +16,7 @@ import random
 import getpass
 import os
 from datetime import date, time, datetime
+import numpy as np  # For DICOM pixel operations
 
 
 # ----------------------> Constants <-------------------------------
@@ -266,7 +267,7 @@ class Study_Class( ):
 
         print(f'Delete private flags: {self.DEL_PRIVATE_FLAG}')
         if self.CROP_US_TOPBAR_FLAG:
-            print('Warning: US image cropping not yet implemented.')
+            print('Warning: US image blanking not fully yet implemented.')
 
         # VR based actions
         row = self.Config_Start_Row
@@ -670,13 +671,8 @@ class Study_Class( ):
         return new_studyID
     
 
-
-
-
     def deidentifyDICOM( self, newPtName = 'Anon', newPtID = 'research' ):
 
-        # ----------------> NEW configurable METHOD <-----------------------
-        #Callback fn for removing private tags
 
         # enact FLAG based actions - need to sync this with excel file
         if self.DEL_PRIVATE_FLAG:
@@ -684,6 +680,9 @@ class Study_Class( ):
         
         if self.DEL_CURVES_FLAG:
              self.DCM.walk( del_curves_callback )
+
+        if self.CROP_US_TOPBAR_FLAG and self.DCM.Modality=='US':
+            self.blankTopBar()
         
         # enact Value Representation (VR) based actions
         def Perform_VR_Actions(dataset, data_element):
@@ -698,13 +697,13 @@ class Study_Class( ):
 
         # enact TAG-based actions
         for [group, element, action, repvalue] in self.tag_action_list:
-            print(f'{pretty_tag(group,element)} action: {action}, rep value: {repvalue}')
-            if [group,element] in self.DCM:
-                old = self.DCM[group,element].value
+            #print(f'{pretty_tag(group,element)} action: {action}, rep value: {repvalue}')
+            if [group,element] in self.DCM:  # If the tag already exists
+                exists = True
             else:
-                old = None
+                exists = False
             
-            if action.lower() == 'replace':
+            if action.lower() == 'replace' and exists:  # ie If 'replace' and tag exists
                 if [group,element] in self.DCM:
                     self.DCM[group, element].value = repvalue
             elif action.lower() == 'delete':
@@ -821,8 +820,28 @@ class Study_Class( ):
         self.cfgsheet[ self.Tag_RVal_Col + '1' ] = 'Replacement Value'
 
 
+    def blankTopBar( self, topbarWidth: int = 50):
+        """Blanks top of [US] images to remove PHI
+        Incompatible with compressed pixel data. 
+        Review your images to confirm both PHI gone and images not corrupted.
 
-        
+        Parameters:
+        topbarWidth (int): Width of strip at the top to blank
+                           Deafults to 50 pixels
+
+        Returns:
+        int: 1=Successful, <0=Fail with err code
+        """
+        if self.DCM.file_meta.TransferSyntaxUID.is_compressed:
+            # PyDICOM gets annoyed if the image data appears compressed.
+            self.DCM.decompress()
+        data = np.array
+        data = self.DCM.pixel_array
+        shape = data.shape
+        data[:,1:topbarWidth,:] = 128
+        self.DCM.PixelData = data.tobytes()
+        return 1
+
 
 
         
@@ -969,5 +988,4 @@ def combotag( group, element, outtype = 'int'):
         return hex(combotag)
 
 
-pass
 

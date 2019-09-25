@@ -80,8 +80,8 @@ args = parser.parse_args()
 # Get script filename and path
 filename = getframeinfo(currentframe()).filename
 parent = Path(filename).resolve().parent
-print( f'CWD: {os.getcwd()}')
-print( f'.py file path: {parent}  {filename}')
+ops.msg( f'CWD: {os.getcwd()}', level = 'VERBOSE')
+ops.msg( f'.py file path: {parent}  {filename}', level = 'VERBOSE')
 
 # Change working directory to the same as the script.
 os.chdir( parent )
@@ -94,12 +94,13 @@ study = study_modules.Study_Class()
 # study.xls_filename = 'my_study.xlsx'
 study.xls_filename = args.xlsfilename
 
-print('Formatting input files...\n')
+ops.msg( 'Formatting input files...\n')
 
 # Use default test directories if no <filenames> given
 if len(args.dicomfiles)<1:
-	print('Using default test directories.')
 	file_paths = [ 'C:\\Users\\oliver\\Documents\\pycode\\Batch-DICOM-Anonymiser\\sample_1' ]
+	ops.msg('Using default DEBUG test directory:')
+	ops.msg( file_paths )
 else:
 	file_paths = args.dicomfiles
 
@@ -108,53 +109,58 @@ else:
 if args.debug:
 	DEBUG = True
 	study.GLOBAL_LOGLEVEL = study.LOGLEVEL_DEBUG
-	print(f'Logging set to {study.LOGLEVEL_TXT[study.GLOBAL_LOGLEVEL]}')
+	ops.msg(f'Logging set to {study.LOGLEVEL_TXT[study.GLOBAL_LOGLEVEL]}', level='VERBOSE')
 else:
 	study.GLOBAL_LOGLEVEL = study.LOGLEVEL_NORMAL
 
 if args.verbose:
-	VERBOSE = True
+	ops.VERBOSE = True
 
 if args.quiet:
-	QUIET = True
+	ops.QUIET = True
 
 #--------------------> Open XLSX to read/write <---------------------------
 study.load_xls( study.xls_filename )
-print(f'\tFound {len(study.xls_UID_lookup)} deidentified studie(s).')
+ops.msg(f'\tFound {len(study.xls_UID_lookup)} deidentified studie(s).', 'VERBOSE')
 
 # Log start of new session
 study.log(f'Launched: Examining {str(file_paths)}', study.LOGLEVEL_NORMAL )
 
+#--------------------> Pre-Process multiple directories
+
+# Loop through all the folders/files in file_paths[]
+# each file/path listed is set as rootDir 
+# Initial dir & file count.
+files = 0
+dirs = 1  # +1 as the root dir is not counted.
+for rootDir in file_paths:
+	for dirName, subdirList, fileList in os.walk(rootDir):
+		files += len(fileList)
+		dirs += len(subdirList)
+
+ops.msg(f'\nFound {files} files in {dirs} directories.\n')
+
 #--------------------> Process multiple directories
+
 
 #loop through all the folders/files in file_paths[]
 # each file/path listed is set as rootDir 
 for rootDir in file_paths:
-	print(f'rootDir = {rootDir}')
+	ops.msg(f'Current root directory: {rootDir}')
 	
 	# If the IRB code is set then use that as anonymised pt name
 	if study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value:
 		study.CurrStudy.AnonName = study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value
 	else:
-		# This portion is old and may be deleted.
+		# If no IRB code then this:
 		# This takes the characters to the right of the last '\\' in the path
 		# and makes it the default anonymised pt name 
 		# eg if rootDir = 'c:\mydicim\ptZERO' then AnonName becomes 'ptZERO'
 		# The slicing /could/ be made more readable...
 		study.CurrStudy.AnonName = rootDir[ -rootDir[-1::-1].find('\\') : ] 
 
-	AnonID = 'RESEARCH'  # not stricty necessary- is redefined later.
-	
 	stats.reset_sub()
-	'''
-	dir_count = 0
-	file_count = 0
-	valid_DCM_file = 0
-	copyOK = 0
-	copyfailed = 0
-	anonok = 0
-	anonfailed = 0
-	'''
+
 
 	#small bit of code to strip the deepest
 	# dir tree from rootDir
@@ -176,7 +182,6 @@ for rootDir in file_paths:
 		dirNameAnon = rootDir + '-anon' + dirName[ len(rootDir): ]
 	
 		# Create the directories as we come across them.
-		# Exits if fails to create
 		create_dir( dirNameAnon, verbose=True )
 		stats.dir_count += 1  # assumed created OK (error raised if not)
 
@@ -185,25 +190,26 @@ for rootDir in file_paths:
 			study.CurrStudy.testfilename = f'{dirName}\\{fname}'
 			study.CurrStudy.savefilename = f'{dirNameAnon}\\{fname}'
 
-			print(f'\t{fname}', end='',flush=True)
+			ops.msg(f'\t{fname}', endstr='')
 
 			# --------------- Check file before processing
 			# File in skip list?
 			if fname in study.SKIP_LIST:
 				stats.skipped_dcm_filenames.append( fname )
-				print(' -on skiplist-')
+				ops.msg(' -on skiplist-')
 				continue
 
 
 			# Check 'fourcc' (bytes from 128 to 132) = "DICM"
 			DICOM = check_DICOM_fourCC( study.CurrStudy.testfilename )
 			if not DICOM:
-				print('\tfourcc says not DICOM -skipping file-')
-				stats.not_DCM_filenames.append(f'{fname}: fourcc failed- non-dicom')
+				ops.msg('-No DICOM fourCC -skipping file-')
+				stats.not_DCM_filenames.append(f'{fname}: fourcc failed-> non-dicom')
 				continue
 			
 			# The meat & bones of deidentification goes on here
-			processOK = process_file( study, study.CurrStudy.testfilename, stats )  # need to remove stats- maybe include as returned value
+			# Would like to remove stats arg- maybe include as returned value
+			processOK = process_file( study, study.CurrStudy.testfilename, stats )  
 			if not processOK:
 				# process_file() returns True if deidentified OK
 				# otherwise returns False.
@@ -214,53 +220,50 @@ for rootDir in file_paths:
 	# Stats on rootDir completion----
 	#update_stats_done_rootDir( subdirList, fileList )
 
-	print(f'Anonymised: {rootDir}')
-	print(f'DICOMs Anonymised:\t{stats.anonok} OK, {stats.anonfailed} failed' )
-	print(f'Non-DICOMs Copied:\t{stats.copyOK} OK, {stats.copyfailed} failed' )
+	ops.msg(f'Completed: {rootDir}')
+	ops.msg(f'DICOMs Anonymised:\t{stats.anonok} OK, {stats.anonfailed} failed' )
+	ops.msg(f'Non-DICOMs Copied:\t{stats.copyOK} OK, {stats.copyfailed} failed' )
 
 
 if stats.all_dir_count > 1:
-	print('\nFinished Batch Job.')
+	ops.msg('\nFinished Batch Job.')
 else:
-	print('\nFinished Job.')
+	ops.msg('\nFinished Job.')
 
-print(f'all_dir_count \t{stats.all_dir_count}')
-print(f'all_file_count \t{stats.all_file_count}')
-print(f'all_valid_DCM_file \t{stats.all_valid_DCM_file}')
-print(f'all_copyOK \t{stats.all_copyOK}')
-print(f'all_copyfailed \t{stats.all_copyfailed}')
-print(f'all_anonok \t{stats.all_anonok}')
-print(f'all_anonfailed \t{stats.all_anonfailed}')
+ops.msg(f'all_dir_count \t{stats.all_dir_count}', level = 'VERBOSE')
+ops.msg(f'all_file_count \t{stats.all_file_count}', level = 'VERBOSE')
+ops.msg(f'all_valid_DCM_file \t{stats.all_valid_DCM_file}', level = 'VERBOSE')
+ops.msg(f'all_copyOK \t{stats.all_copyOK}', level = 'VERBOSE')
+ops.msg(f'all_copyfailed \t{stats.all_copyfailed}', level = 'VERBOSE')
+ops.msg(f'all_anonok \t{stats.all_anonok}', level = 'VERBOSE')
+ops.msg(f'all_anonfailed \t{stats.all_anonfailed}', level = 'VERBOSE')
 
 print(f'\nskipped: ')
 if len(stats.skipped_dcm_filenames) > 0:
 	for line in stats.skipped_dcm_filenames:
-		print(f'\t{line}')
+		ops.msg(f'\t{line}', level='VERBOSE')
 else:
-		print('\tNone')
+		ops.msg('\tNone')
 
-print(f'\npresumed non-DICOM:')
+ops.msg(f'\npresumed non-DICOM:', level='VERBOSE')
 if len(stats.not_DCM_filenames) > 0:
 	for line in stats.not_DCM_filenames:
-		print(f'\t{line}')
+		ops.msg(f'\t{line}', level='VERBOSE')
 else:
-	print('\tNone')
+	ops.msg('\tNone', level='VERBOSE')
 
-print(f'\n\n{len(stats.tag_warning)} tag warnings:')
+ops.msg(f'\n\n{len(stats.tag_warning)} tag warnings:')
 if len(stats.tag_warning) > 0:
 	for line in stats.tag_warning:
-		print(f'\t{line}')
+		ops.msg(f'\t{line}')
 else:
-	print('\tNone')
+	ops.msg('\tNone')
 
 study.log( f'Completed. Deidentified {stats.all_anonok}, failed {stats.all_anonfailed}', study.LOGLEVEL_NORMAL )
 
-#studytools.write_xls_to_disc( study.XLS, study.xls_filename )
 study.write_xls_to_disc( study.xls_filename )
 
 
-
-
-#-----------------------> Helper Functions <-----------------------------------
+#-----------------------> End of main routine <-----------------------------------
 
 

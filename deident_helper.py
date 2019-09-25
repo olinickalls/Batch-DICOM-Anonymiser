@@ -15,14 +15,17 @@ class Ops_Class( ):
     VERBOSE = False
     DEBUG = False
 
-    def msg(self, message, level ):
+
+    def msg(self, message, level = 'NORMAL', endstr = '\n' ):
+		# level should correlate with Quiet/Normal/Verbose string
+		# if level arg is omitted, it will default to 'NORMAL'
         if self.QUIET:  # Quiet prints nothing
             return
         if self.VERBOSE or self.DEBUG:  # verbose prints everything
-            print( message )
+            print( message, end = endstr )
             return
         # Only not QUIET or VERBOSE reaches this point.
-        if level == 2:
+        if level == 'NORMAL':
             print( message )
 
 
@@ -115,6 +118,5 @@ def check_DICOM_fourCC( filename ):
 		return False
 
 
-
-
+	
 
