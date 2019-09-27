@@ -22,7 +22,6 @@ Planned enhancements:
 -?encrypt / scramble log output?
 '''
 global stats
-global ops
 
 import os         
 import sys        
@@ -38,9 +37,6 @@ from pathlib import Path
 
 stats = study_modules.FileStats_Class()
 ops = Ops_Class()
-ops.DEBUG = False
-ops.VERBOSE = False
-ops.QUIET = False
 
 #-------------------------> INITIALISATION <---------------------------------
 parser = argparse.ArgumentParser(
@@ -77,51 +73,42 @@ parser.add_argument('dicomfiles',  # positional arg -no '-' required
 	)
 args = parser.parse_args()
 
+# ---------------------------------------------------------------------------
+# Create Study_Class object- ops class as argument to pass environ data
+study = study_modules.Study_Class( QUIET = args.quiet,
+								   VERBOSE = args.verbose,
+								   DEBUG = args.debug 
+								 )
+
 # Get script filename and path
 filename = getframeinfo(currentframe()).filename
 parent = Path(filename).resolve().parent
-ops.msg( f'CWD: {os.getcwd()}', level = 'VERBOSE')
-ops.msg( f'.py file path: {parent}  {filename}', level = 'VERBOSE')
+study.msg( f'CWD: {os.getcwd()}', level = 'VERBOSE')
+study.msg( f'.py file path: {parent}  {filename}', level = 'VERBOSE')
 
 # Change working directory to the same as the script.
 os.chdir( parent )
 
-# ---------------------------------------------------------------------------
-# Create Study_Class object
-study = study_modules.Study_Class()
+# -------------------------------------------------------------------
 
 # Set basic info
 # study.xls_filename = 'my_study.xlsx'
 study.xls_filename = args.xlsfilename
 
-ops.msg( 'Formatting input files...\n')
+study.msg( 'Formatting input files...\n')
 
 # Use default test directories if no <filenames> given
 if len(args.dicomfiles)<1:
 	file_paths = [ 'C:\\Users\\oliver\\Documents\\pycode\\Batch-DICOM-Anonymiser\\sample_1' ]
-	ops.msg('Using default DEBUG test directory:')
-	ops.msg( file_paths )
+	study.msg('Using default DEBUG test directory:')
+	study.msg( file_paths )
 else:
 	file_paths = args.dicomfiles
 
 
-# Set global log level
-if args.debug:
-	DEBUG = True
-	study.GLOBAL_LOGLEVEL = study.LOGLEVEL_DEBUG
-	ops.msg(f'Logging set to {study.LOGLEVEL_TXT[study.GLOBAL_LOGLEVEL]}', level='VERBOSE')
-else:
-	study.GLOBAL_LOGLEVEL = study.LOGLEVEL_NORMAL
-
-if args.verbose:
-	ops.VERBOSE = True
-
-if args.quiet:
-	ops.QUIET = True
-
 #--------------------> Open XLSX to read/write <---------------------------
 study.load_xls( study.xls_filename )
-ops.msg(f'\tFound {len(study.xls_UID_lookup)} deidentified studie(s).', 'VERBOSE')
+study.msg(f'\tFound {len(study.xls_UID_lookup)} deidentified studie(s).', 'VERBOSE')
 
 # Log start of new session
 study.log(f'Launched: Examining {str(file_paths)}', study.LOGLEVEL_NORMAL )
@@ -138,7 +125,7 @@ for rootDir in file_paths:
 		files += len(fileList)
 		dirs += len(subdirList)
 
-ops.msg(f'\nFound {files} files in {dirs} directories.\n')
+study.msg(f'\nFound {files} files in {dirs} directories.\n')
 
 #--------------------> Process multiple directories
 
@@ -146,7 +133,7 @@ ops.msg(f'\nFound {files} files in {dirs} directories.\n')
 #loop through all the folders/files in file_paths[]
 # each file/path listed is set as rootDir 
 for rootDir in file_paths:
-	ops.msg(f'Current root directory: {rootDir}')
+	study.msg(f'Current root directory: {rootDir}')
 	
 	# If the IRB code is set then use that as anonymised pt name
 	if study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value:
@@ -190,20 +177,20 @@ for rootDir in file_paths:
 			study.CurrStudy.testfilename = f'{dirName}\\{fname}'
 			study.CurrStudy.savefilename = f'{dirNameAnon}\\{fname}'
 
-			ops.msg(f'\t{fname}', endstr='')
+			study.msg(f'\t{fname} ...', endstr='\t')
 
 			# --------------- Check file before processing
 			# File in skip list?
 			if fname in study.SKIP_LIST:
 				stats.skipped_dcm_filenames.append( fname )
-				ops.msg(' -on skiplist-')
+				study.msg(' -on skiplist-')
 				continue
 
 
 			# Check 'fourcc' (bytes from 128 to 132) = "DICM"
 			DICOM = check_DICOM_fourCC( study.CurrStudy.testfilename )
 			if not DICOM:
-				ops.msg('-No DICOM fourCC -skipping file-')
+				study.msg('-No DICOM fourCC -skipping file-')
 				stats.not_DCM_filenames.append(f'{fname}: fourcc failed-> non-dicom')
 				continue
 			
@@ -220,44 +207,44 @@ for rootDir in file_paths:
 	# Stats on rootDir completion----
 	#update_stats_done_rootDir( subdirList, fileList )
 
-	ops.msg(f'Completed: {rootDir}')
-	ops.msg(f'DICOMs Anonymised:\t{stats.anonok} OK, {stats.anonfailed} failed' )
-	ops.msg(f'Non-DICOMs Copied:\t{stats.copyOK} OK, {stats.copyfailed} failed' )
+	study.msg(f'Completed: {rootDir}')
+	study.msg(f'DICOMs Anonymised:\t{stats.anonok} OK, {stats.anonfailed} failed' )
+	study.msg(f'Non-DICOMs Copied:\t{stats.copyOK} OK, {stats.copyfailed} failed' )
 
 
 if stats.all_dir_count > 1:
-	ops.msg('\nFinished Batch Job.')
+	study.msg('\nFinished Batch Job.')
 else:
-	ops.msg('\nFinished Job.')
+	study.msg('\nFinished Job.')
 
-ops.msg(f'all_dir_count \t{stats.all_dir_count}', level = 'VERBOSE')
-ops.msg(f'all_file_count \t{stats.all_file_count}', level = 'VERBOSE')
-ops.msg(f'all_valid_DCM_file \t{stats.all_valid_DCM_file}', level = 'VERBOSE')
-ops.msg(f'all_copyOK \t{stats.all_copyOK}', level = 'VERBOSE')
-ops.msg(f'all_copyfailed \t{stats.all_copyfailed}', level = 'VERBOSE')
-ops.msg(f'all_anonok \t{stats.all_anonok}', level = 'VERBOSE')
-ops.msg(f'all_anonfailed \t{stats.all_anonfailed}', level = 'VERBOSE')
+study.msg(f'all_dir_count \t{stats.all_dir_count}', level = 'VERBOSE')
+study.msg(f'all_file_count \t{stats.all_file_count}', level = 'VERBOSE')
+study.msg(f'all_valid_DCM_file \t{stats.all_valid_DCM_file}', level = 'VERBOSE')
+study.msg(f'all_copyOK \t{stats.all_copyOK}', level = 'VERBOSE')
+study.msg(f'all_copyfailed \t{stats.all_copyfailed}', level = 'VERBOSE')
+study.msg(f'all_anonok \t{stats.all_anonok}', level = 'VERBOSE')
+study.msg(f'all_anonfailed \t{stats.all_anonfailed}', level = 'VERBOSE')
 
 print(f'\nskipped: ')
 if len(stats.skipped_dcm_filenames) > 0:
 	for line in stats.skipped_dcm_filenames:
-		ops.msg(f'\t{line}', level='VERBOSE')
+		study.msg(f'\t{line}', level='VERBOSE')
 else:
-		ops.msg('\tNone')
+		study.msg('\tNone')
 
-ops.msg(f'\npresumed non-DICOM:', level='VERBOSE')
+study.msg(f'\npresumed non-DICOM:', level='VERBOSE')
 if len(stats.not_DCM_filenames) > 0:
 	for line in stats.not_DCM_filenames:
-		ops.msg(f'\t{line}', level='VERBOSE')
+		study.msg(f'\t{line}', level='VERBOSE')
 else:
-	ops.msg('\tNone', level='VERBOSE')
+	study.msg('\tNone', level='VERBOSE')
 
-ops.msg(f'\n\n{len(stats.tag_warning)} tag warnings:')
+study.msg(f'\n\n{len(stats.tag_warning)} tag warnings:')
 if len(stats.tag_warning) > 0:
 	for line in stats.tag_warning:
-		ops.msg(f'\t{line}')
+		study.msg(f'\t{line}')
 else:
-	ops.msg('\tNone')
+	study.msg('\tNone')
 
 study.log( f'Completed. Deidentified {stats.all_anonok}, failed {stats.all_anonfailed}', study.LOGLEVEL_NORMAL )
 

@@ -97,6 +97,10 @@ class Study_Class( ):
     # The constants could be moved into a separate 'from _ import *' as they
     # don't, need to be accessed through the class -I just want them global
 
+    QUIET = False
+    VERBOSE = False
+    DEBUG = False
+
     XLSPAGE_TITLE = 'A1'
 
     XLSFRONT_STUDYTITLE_CELL = 'B2'
@@ -160,17 +164,30 @@ class Study_Class( ):
     tag_action_list = []
 
     FLAGS_COL = 'F'
-
     #Please do not mess with the _CELL definitions below-
     # They need to tie in with the code to generate the
     # new blank XLS templates in create_new_study()
     # not sure how else to do it
-    flags_dict = {}
-    flags_list = [
-        'DEL_PRIVATE_FLAGS',
+    flag_list = [
+        'DEL_PRIVATE_FLAG',
         'DEL_CURVES_FLAG',
         'CROP_US_TOPBAR_FLAG'
         ]
+    flag_default = [
+        'TRUE',
+        'TRUE',
+        '65'
+        ]
+    flag_dict = {}
+    flag_cell = {}
+    row = Config_Start_Row
+    # Creates zero-ordered list of flags
+    for item in flag_list:
+        flag_dict[ item ] = row
+        flag_cell[ item ] = FLAG_VAL_COL + str( row )
+        row += 1
+    
+
     DEL_PRIVATE_FLAG_CELL = FLAGS_COL + '3'
     DEL_CURVES_FLAG_CELL = FLAGS_COL + '4'
     CROP_US_TOPBAR_FLAG_CELL = FLAGS_COL + '5'
@@ -237,6 +254,21 @@ class Study_Class( ):
     # *                                                                   *
     # *********************************************************************
 
+    def __init__(self, QUIET = False, VERBOSE = False, DEBUG = False ):
+        # Duplicate some flags from ops class
+        if QUIET:
+            self.QUIET = True
+        if VERBOSE:
+            self.VERBOSE = True
+        # Set global log level
+        if DEBUG:
+            self.DEBUG = True
+            self.GLOBAL_LOGLEVEL = self.LOGLEVEL_DEBUG
+            self.msg(f'Logging set to {self.LOGLEVEL_TXT[self.GLOBAL_LOGLEVEL]}', level='VERBOSE')
+        else:
+            self.GLOBAL_LOGLEVEL = self.LOGLEVEL_NORMAL
+
+
     # ####################################>  Helper function for .load_xls()
     def import_xls_settings( self ):
         # setup standard human-readable shortcuts (more readable for me...)
@@ -256,18 +288,8 @@ class Study_Class( ):
 
         # Load config from the Config sheet <--------------------------
         # Flags:  to tidy- do I need both the FLAG and flags dict?
-        self.DEL_PRIVATE_FLAG = self.cfgsheet[ self.DEL_PRIVATE_FLAG_CELL ].value
-        self.flags_dict['DEL_PRIVATE_FLAG'] = self.cfgsheet[ self.DEL_PRIVATE_FLAG_CELL ].value
-        
-        self.DEL_CURVES_FLAG = self.cfgsheet[ self.DEL_CURVES_FLAG_CELL ].value
-        self.flags_dict['DEL_CURVES_FLAG'] = self.cfgsheet[ self.DEL_CURVES_FLAG_CELL ].value
-
-        self.CROP_US_TOPBAR_FLAG = self.cfgsheet[ self.CROP_US_TOPBAR_FLAG_CELL ].value
-        self.flags_dict['CROP_US_TOPBAR_FLAG'] = self.cfgsheet[ self.CROP_US_TOPBAR_FLAG_CELL ].value
-
-        print(f'Delete private flags: {self.DEL_PRIVATE_FLAG}')
-        if self.CROP_US_TOPBAR_FLAG:
-            print('Warning: US image blanking not fully yet implemented.')
+        self.readXLSFlags()
+        self.displayXLSFlags()
 
         # VR based actions
         row = self.Config_Start_Row
@@ -463,12 +485,33 @@ class Study_Class( ):
                 )
 
         return row
+    
 
+    def readXLSFlags( self ):
 
+        for item in self.flag_list:
+            self.flag_dict[item] = self.cfgsheet[ self.flag_cell[item] ].value
+            self.msg(f'Flag {item}: {self.flag_dict[item]} (new method)')
+
+    def displayXLSFlags( self ):
+        '''displayFlags()
+        Print to screen the flags and if enabled or not.
+        Only prints if Normal or Verbose, not Quiet
+        '''
+        if self.QUIET:
+            return
+        for item in self.flag_list:
+            self.msg(f'Flag {item}: \t{ self.flag_dict[item] }  ')
+            self.flag_dict[item] = self.cfgsheet[ self.flag_cell[item] ].value
+
+        print(f'DEL_CURVES_FLAG: { self.flag_dict["DEL_CURVES_FLAG"] }')
+        print(f'DEL_PRIVATE_FLAG: { self.flag_dict["DEL_PRIVATE_FLAG"] }')
+        print(f'CROP_US_TOPBAR: { self.flag_dict["CROP_US_TOPBAR_FLAG"] }')
+        if self.flag_dict['CROP_US_TOPBAR_FLAG']:
+            self.msg('\tWarning: US image blanking does not support compressed images.  Output must be checked for PHI.')
 
 
     #------------------------------------------------------------------------------------------------------
-
     def log( self, message_str, msg_log_level=LOGLEVEL_NORMAL ):
         '''
         This is supposed to add a new line to the log page in the XLS file, describing a change.
@@ -496,6 +539,20 @@ class Study_Class( ):
         self.next_log_row += 1
 
         return True
+    
+
+    def msg(self, message, level = 'NORMAL', endstr = '\n' ):
+		# level should correlate with Quiet/Normal/Verbose string
+		# if level arg is omitted, it will default to 'NORMAL'
+        if self.QUIET:  # Quiet prints nothing
+            return
+        if self.VERBOSE or self.DEBUG:  # verbose prints everything
+            print( message, end = endstr )
+            return
+        # Only not QUIET or VERBOSE reaches this point.
+        if level == 'NORMAL':
+            print( message, end = endstr )
+
 
 
 
@@ -675,13 +732,13 @@ class Study_Class( ):
 
 
         # enact FLAG based actions - need to sync this with excel file
-        if self.DEL_PRIVATE_FLAG:
+        if self.flag_dict['DEL_PRIVATE_FLAG']:
             self.DCM.remove_private_tags()
         
-        if self.DEL_CURVES_FLAG:
+        if self.flag_dict['DEL_CURVES_FLAG']:
              self.DCM.walk( del_curves_callback )
 
-        if self.CROP_US_TOPBAR_FLAG and self.DCM.Modality=='US':
+        if self.flag_dict['CROP_US_TOPBAR_FLAG'] and self.DCM.Modality=='US':
             self.blankTopBar()
         
         # enact Value Representation (VR) based actions
@@ -805,8 +862,8 @@ class Study_Class( ):
         # keeping them in the same position
         row = self.Config_Start_Row
         offset = 0
-        for flag in self.flags_list:
-            self.cfgsheet[ self.FLAG_COL + str(row + offset)] = flag
+        for flag_name in self.flag_list:
+            self.cfgsheet[ self.FLAG_COL + str(row + offset)] = flag_name
             self.cfgsheet[ self.FLAG_VAL_COL + str(row + offset)] = 'FALSE'
             offset += 1
 
