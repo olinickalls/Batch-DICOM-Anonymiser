@@ -1,10 +1,10 @@
-'''
-Class definitions for 'Study' Class
-encompasses:
-    openpyxl and pydicom objects
-    simple variables (like cell and column definitions)
-    methods:
-'''
+#'''
+#Class definitions for 'Study' Class
+#encompasses:
+#    openpyxl and pydicom objects
+#    simple variables (like cell and column definitions)
+#    methods:
+#'''
 
 # PEP 8 compliance is a work in progress... sigh 
 
@@ -15,7 +15,7 @@ import openpyxl
 import random
 import getpass
 import os
-from datetime import date, time, datetime
+from datetime import date, time, datetime, timedelta
 import numpy as np  # For DICOM pixel operations
 
 
@@ -44,10 +44,12 @@ class FileStats_Class( ):
     dir_count = 0
     file_count = 0
     valid_DCM_file = 0
+    nondicom = 0
     copyOK = 0
     copyfailed = 0
     anonok = 0
     anonfailed = 0
+    ignored = 0
 
     # Overall stats for the whole operation
     all_dir_count = 0
@@ -70,6 +72,9 @@ class FileStats_Class( ):
         self.copyfailed = 0
         self.anonok = 0
         self.anonfailed = 0
+        self.nondicom = 0
+        self.ignored = 0
+
     
     def start_subdir( self, subdirlist, filelist ):
         self.dir_count  += len( subdirlist )
@@ -89,6 +94,23 @@ class FileStats_Class( ):
         self.all_anonfailed += self.anonfailed
 
 
+class BasicDetails():
+    AnonName = ""
+    AnonID = ""
+    PatientID = ""
+    StudyInstanceUID = ""
+    delta = None
+
+    testfilename = ""
+    savefilename = ""
+    def clean(self):
+        self.AnonName = ""
+        self.AnonID = ""
+        self.PatientID = ""
+        self.StudyInstanceUID = ""
+        self.delta = None
+        self.testfilename = ""
+        self.savefilename = ""
 
 
 class Study_Class( ):
@@ -96,10 +118,12 @@ class Study_Class( ):
     # These are column or cell references prefixed by the sheet they belong in
     # The constants could be moved into a separate 'from _ import *' as they
     # don't, need to be accessed through the class -I just want them global
+    CurrStudy = BasicDetails()
 
     QUIET = False
     VERBOSE = False
     DEBUG = False
+    NEW_PREAMBLE = b'deidentified by Batch DICOM DeIdentifier' + b'\x00' * 88
 
     XLSPAGE_TITLE = 'A1'
 
@@ -116,6 +140,7 @@ class Study_Class( ):
     XLSDATA_ACCESSIONNUMBER = 'K'
     XLSDATA_STUDYDATE = 'M'
     XLSDATA_STUDYTIME = 'N'
+    XLSDATA_DT_DELTA = 'O'
     XLSDATA_STUDYUID = 'P'
     XLSDATA_STUDYDESCRIPTION = 'R'
 
@@ -124,9 +149,6 @@ class Study_Class( ):
     XLSLOG_ACTIVITY = 'E'
     XLSLOG_USER = 'G'
     XLSLOG_COMPUTER = 'H'
-
-
-    #self.cfgsheet = xls['Config']
 
     Config_Start_Row = 3
 
@@ -145,7 +167,8 @@ class Study_Class( ):
 
     vr_actions = {}
     vr_action_list = []
-    list_of_vr_actions = ['set_all_AE', 'set_all_AS',
+    list_of_vr_actions = [
+        'set_all_AE', 'set_all_AS',
         'set_all_AT', 'set_all_CS',
         'set_all_DA', 'set_all_DS',
         'set_all_DT', 'set_all_FL',
@@ -163,7 +186,6 @@ class Study_Class( ):
     tag_actions = {}
     tag_action_list = []
 
-    FLAGS_COL = 'F'
     #Please do not mess with the _CELL definitions below-
     # They need to tie in with the code to generate the
     # new blank XLS templates in create_new_study()
@@ -171,26 +193,29 @@ class Study_Class( ):
     flag_list = [
         'DEL_PRIVATE_FLAG',
         'DEL_CURVES_FLAG',
-        'CROP_US_TOPBAR_FLAG'
+        'CROP_US_TOPBAR_FLAG',
+        'SET_DATE',
+        'SET_TIME',
+        'PRESERVE_PT_TIMELINE'
         ]
     flag_default = [
-        'TRUE',
-        'TRUE',
-        '65'
+        'TRUE',  # Do delete private flags
+        'TRUE',  # Do delete Curves
+        '65px',  # Crop topbar in US image by 65
+        '20101010',  # default date
+        '120000.00',  # default time
+        'TRUE'  # Maintain timeline for each patient by using a datetime delta
         ]
-    flag_dict = {}
+    flag_dict = {}  # index will be the flag name, contains set value from XLS
     flag_cell = {}
-    row = Config_Start_Row
-    # Creates zero-ordered list of flags
-    for item in flag_list:
-        flag_dict[ item ] = row
-        flag_cell[ item ] = FLAG_VAL_COL + str( row )
-        row += 1
-    
 
-    DEL_PRIVATE_FLAG_CELL = FLAGS_COL + '3'
-    DEL_CURVES_FLAG_CELL = FLAGS_COL + '4'
-    CROP_US_TOPBAR_FLAG_CELL = FLAGS_COL + '5'
+    
+    dt_delta = {}  #  Date Time Delta dictionary.
+
+    # This may now be obsolete so long as flag_list order is maintained.
+    #DEL_PRIVATE_FLAG_CELL = FLAGS_COL + '3'
+    #DEL_CURVES_FLAG_CELL = FLAGS_COL + '4'
+    #CROP_US_TOPBAR_FLAG_CELL = FLAGS_COL + '5'
 
     xls_UID_lookup             = {}
     test_study_UID             = ''
@@ -238,13 +263,15 @@ class Study_Class( ):
     DCM = pydicom.Dataset()
     XLS = openpyxl.Workbook()
 
-    class CurrStudy():
-        AnonName = ""
-        AnonID = ""
-        StudyInstanceUID = ""
-
-        testfilename = ""
-        savefilename = ""
+    # DateTime variables
+    # Default reference date is 15th July 2015, midday
+    # This should be configured by XLS
+    REF_YEAR = 2015
+    REF_MONTH = 7
+    REF_DAY = 15
+    REF_HH = 12
+    REF_MM = 00
+    REF_SS = 00
 
 
     # *********************************************************************
@@ -267,6 +294,26 @@ class Study_Class( ):
             self.msg(f'Logging set to {self.LOGLEVEL_TXT[self.GLOBAL_LOGLEVEL]}', level='VERBOSE')
         else:
             self.GLOBAL_LOGLEVEL = self.LOGLEVEL_NORMAL
+        
+        # Load flag defaults into flag_dict dict.
+        # enter flag cell location into flag_cell dict.
+        line = 0
+        for item in self.flag_list:
+            self.flag_dict[ item ] = self.flag_default[line]
+            self.flag_cell[ item ] = self.FLAG_VAL_COL + str( line + self.Config_Start_Row )
+            line += 1
+        for item in self.flag_dict:
+            print(f'__init__ flag_dict[{item}] = {self.flag_dict[item]}')
+
+
+    def _update_fromDCM(self):
+        #self.CurrStudy.AnonName = ""  # Not yet created
+        #self.CurrStudy.AnonID = ""  # Not yet created
+        self.CurrStudy.PatientID = self.DCM.PatientID
+        self.CurrStudy.StudyInstanceUID = self.DCM.StudyInstanceUID
+        # delta is cached on loading XLS in study.load_XLS
+        if self.CurrStudy.PatientID in self.dt_delta:
+            self.CurrStudy.delta = self.dt_delta[self.CurrStudy.PatientID]
 
 
     # ####################################>  Helper function for .load_xls()
@@ -282,6 +329,7 @@ class Study_Class( ):
 
         # Load the existing UIDs into the dict cache
         self.cache_existing_xls_UIDs( )
+        self.cache_dt_delta()
 
         # Identify row of the first available new studyID
         self.next_studyID_row = self.first_available_studyID_row( )
@@ -291,7 +339,7 @@ class Study_Class( ):
         self.readXLSFlags()
         self.displayXLSFlags()
 
-        # VR based actions
+        # Read VR based actions
         row = self.Config_Start_Row
         action = str(self.cfgsheet[ self.VR_Action_Col + str(row) ].value).lower()
         enabled = self.cfgsheet[ self.VR_Val_Col + str(row) ].value
@@ -418,6 +466,7 @@ class Study_Class( ):
         #perform baseline evaluation of all new workbooks
         self.find_first_available_log_row()
         self.cache_existing_xls_UIDs( )
+        self.cache_dt_delta()
         self.next_studyID_row = self.first_available_studyID_row( )
 
         self.log( f'xls_repopulate_attribs: Complete.', self.LOGLEVEL_DEBUG )
@@ -439,7 +488,7 @@ class Study_Class( ):
         """
         self.log('.cache_existing_xls_UIDs(): Started.', self.LOGLEVEL_DEBUG )
         
-        # Probably unnecessary re-definition
+        # Probably unnecessary re-definition/reset
         self.xls_UID_lookup = {}
 
         row = 2
@@ -450,18 +499,60 @@ class Study_Class( ):
         check_ptID = self.datasheet[self.XLSDATA_PATIENTID + str(row)].value
         check_studyID = self.datasheet[self.XLSDATA_STUDYIDS + str(row)].value
         check_study_UID = self.datasheet[self.XLSDATA_STUDYUID + str(row)].value
+        #raw_dt_delta = None
 
         while (check_studyID != None ) and (check_ptID != None ) and (row <= max_row ):
             self.xls_UID_lookup[ check_study_UID ] = row
+            #if raw_dt_delta:
+            #    self.dt_delta[ check_ptID ] = self.delta_str2obj(raw_dt_delta)
             row += 1
             check_ptID      = self.datasheet[ self.XLSDATA_PATIENTID + str(row) ].value
             check_studyID   = self.datasheet[ self.XLSDATA_STUDYIDS  + str(row) ].value
             check_study_UID = self.datasheet[ self.XLSDATA_STUDYUID  + str(row) ].value
+            #raw_dt_delta = self.datasheet[ self.XLSDATA_DT_DELTA + str(row)].value
 
         self.log( f'self.cache_existing_xls_UIDs: Completed OK. Found&cached {len(self.xls_UID_lookup)} existing UIDs.  Final row={row}', self.LOGLEVEL_HIGH )
         return True
 
 
+    def cache_dt_delta( self ):
+        '''Load all encountered original pt IDs and associated datetime delta
+        Extract string from XLS.Data dt_delta column.
+        Convert to datetime.timedelta object
+        Store timedelta object in dt_delta dictionary
+        Return: None
+        Params: None
+        '''
+        #  self.XLSDATA_DATETIME_DELTA is the log column
+        #  dt_delta is the cache dictionary.
+        #  expected format "days:seconds.miliseconds"
+        #  dt_delta key is real ptID (as same delta for that pt)
+        self.msg('.cache_dt_delta: caching deltas from XLS')
+        self.log('.cache_dt_delta: Started....', self.LOGLEVEL_DEBUG )
+        row = 2
+        max_row = self.frontsheet[ self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL ].value
+        max_row = int(max_row + 1)
+        # +1 as the data-containing rows start at row 2, not 1
+
+        ptID = self.datasheet[self.XLSDATA_PATIENTID + str(row)].value
+        delta = None
+        delta = self.datasheet[self.XLSDATA_DT_DELTA + str(row)].value
+
+        while (ptID != None ):
+            if (delta != None) and (ptID not in self.dt_delta):  
+                # ONLY if a delta exists
+                # AND ptID not already assigned a delta
+                # delta is the raw XLS string value
+                # convert into a timedelta object & store in dt_delta dict
+                self.dt_delta[ ptID ] = delta_str2obj( delta )
+            row += 1
+            ptID = self.datasheet[self.XLSDATA_PATIENTID + str(row)].value
+            delta = self.datasheet[self.XLSDATA_DT_DELTA + str(row)].value
+            
+        self.log( f'.cache_dt_delta(): Completed. Found&cached {len(self.dt_delta)} unique ptIDs & deltas.', self.LOGLEVEL_HIGH )
+        self.msg(f'Found&cached {len(self.dt_delta)} unique ptIDs & deltas.')
+        return True
+    
 
     def find_first_available_log_row( self ):
         '''
@@ -491,7 +582,11 @@ class Study_Class( ):
 
         for item in self.flag_list:
             self.flag_dict[item] = self.cfgsheet[ self.flag_cell[item] ].value
-            self.msg(f'Flag {item}: {self.flag_dict[item]} (new method)')
+            #self.msg(f'Flag {item}: {self.flag_dict[item]} (new method)')
+        
+        for item in self.flag_dict:
+            print(f'readXLSFlags: flag_dict[{item}] = {self.flag_dict[item]}')
+
 
     def displayXLSFlags( self ):
         '''displayFlags()
@@ -501,14 +596,12 @@ class Study_Class( ):
         if self.QUIET:
             return
         for item in self.flag_list:
-            self.msg(f'Flag {item}: \t{ self.flag_dict[item] }  ')
-            self.flag_dict[item] = self.cfgsheet[ self.flag_cell[item] ].value
+            self.msg(f'Flag {item.ljust(25," ")}: { self.flag_dict[item] }  ')
 
-        print(f'DEL_CURVES_FLAG: { self.flag_dict["DEL_CURVES_FLAG"] }')
-        print(f'DEL_PRIVATE_FLAG: { self.flag_dict["DEL_PRIVATE_FLAG"] }')
-        print(f'CROP_US_TOPBAR: { self.flag_dict["CROP_US_TOPBAR_FLAG"] }')
+
+
         if self.flag_dict['CROP_US_TOPBAR_FLAG']:
-            self.msg('\tWarning: US image blanking does not support compressed images.  Output must be checked for PHI.')
+            self.msg('\tWarning: US image blanking does not support compressed images.  Output must be checked for residual PHI.')
 
 
     #------------------------------------------------------------------------------------------------------
@@ -525,19 +618,15 @@ class Study_Class( ):
 
         # log date, time, activity, user, computer
         row_text = str( self.next_log_row )
-        
         self.logsheet[ self.XLSLOG_ACTIVITY + row_text ] = f'({ self.LOGLEVEL_TXT[ msg_log_level ] }): { message_str }'
-
         dateobject = datetime.now()
 
         self.logsheet[ self.XLSLOG_DATE     + row_text ] = dateobject.strftime('%d-%m-%Y') # date  
         self.logsheet[ self.XLSLOG_TIME     + row_text ] = dateobject.strftime('%H:%M:%S') # timenow
         self.logsheet[ self.XLSLOG_USER     + row_text ] = self.log_username               # username
         self.logsheet[ self.XLSLOG_COMPUTER + row_text ] = self.log_computername           # compname
-
         # Finally increment the Log row pointer
         self.next_log_row += 1
-
         return True
     
 
@@ -554,10 +643,6 @@ class Study_Class( ):
             print( message, end = endstr )
 
 
-
-
-
-
     def get_DCM_StudyInstanceUID( self ):
         '''
         Returns the Study Instance UID from the specified DICOM file object
@@ -569,19 +654,12 @@ class Study_Class( ):
             which is not visible to the standard dicom_object.StudyInstanceUID method.
         '''
         siUID = False
-
         for elem in self.DCM.iterall():
             if 'Study Instance UID' == elem.name:
                 siUID = elem.value
                 break   # Stops at 1st StudyInstanceUID
-
         # If no StudyInstanceUID tag is found, this returns False
         return siUID
-
-
-
-
-
 
 
     def get_old_study_attrib_from_UID( self, attribute, test_uid ):
@@ -593,17 +671,9 @@ class Study_Class( ):
         Use the static xls_Data_... column values from studytools.py
         eg. xls_Data_study_UID
         '''
-
         old_study_ID = self.datasheet[ attribute + str( self.xls_UID_lookup[ test_uid ] )  ].value
-
         return old_study_ID
     
-
-
-
-
-
-
 
     def first_available_studyID_row ( self ):
         """
@@ -643,18 +713,9 @@ class Study_Class( ):
                 value = failure_value
 
         return value
-                
 
 
-
-
-
-
-
-    ## - This method is flawed. It does not work as intended- wrong use of generator.
-    # - I expect it runs the whole method EVERY time its is run. This is slow.
-
-
+    # - Works but maybe not as expected...
     def assign_next_free_studyID ( self ):   #XLS openpyxl workbook object
         '''
         Returns the new studyID, populates current DCM data into corresponding datasheet row & logs made
@@ -662,23 +723,18 @@ class Study_Class( ):
         Built-in check to see if exceeded number of valid studyIDs
         
         '''
-        
         self.log( 'running: assign_next_free_studyID()', self.LOGLEVEL_DEBUG )
 
         # If this is the 1st time running then do this
         if self.next_studyID_row == 0:
             self.next_studyID_row = self.first_available_studyID_row( )
         
-
         new_studyID    = self.datasheet[ self.XLSDATA_STUDYIDS + str( self.next_studyID_row ) ].value
         new_UID        = self.DCM.StudyInstanceUID
         no_of_studyIDs = self.frontsheet[ self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL ].value
 
-
         # Check to see if we have exceeded available StudyIDs
         if self.next_studyID_row > ( no_of_studyIDs + 1) and new_studyID == None:
-            #This will happen if we have run out of possible studyIDs
-            # Actually, this 'else' statement is redundant but makes the code clearer to me.
             self.log( '<obj>.assign_next_free_studyID: Run out of Study IDs in the xls file!!!', self.LOGLEVEL_NORMAL)
             return False
         elif self.next_studyID_row > ( no_of_studyIDs + 1) and new_studyID != None:
@@ -686,10 +742,6 @@ class Study_Class( ):
             # However, new_studyID != None -ie the datacell in the XLS is not empty. We presume this cell contains a valid studyID...
             # A warning is logged however.
             self.log(f'<>.assign_next_free_studyID: WARNING -- next_studyID_row ({self.next_studyID_row}) is more than no_of_studyIDs ({no_of_studyIDs}) but XLScell is non-empty ({new_studyID}). Assuming it contains a valid studyID', self.LOGLEVEL_NORMAL)
-
-
-        #next_study_ID_generator = studytools.next_XLSrow_gen( starting_row, no_of_studyIDs, self.datasheet, self.xlsData_study_IDs )
-
 
         # Populate current pt data into XLS datasheet studyID into 
         dateobject = datetime.now()
@@ -706,7 +758,12 @@ class Study_Class( ):
         self.datasheet[ self.XLSDATA_STUDYTIME        +  current_row_str ] = str( self.try_dcm_attrib( 'StudyTime',        'Nil' ) )
         self.datasheet[ self.XLSDATA_STUDYUID         +  current_row_str ] = str( self.try_dcm_attrib( 'StudyInstanceUID', 'Nil' ) )
         self.datasheet[ self.XLSDATA_STUDYDESCRIPTION +  current_row_str ] = str( self.try_dcm_attrib( 'StudyDescription', 'Nil' ) )
-        
+
+        #self.msg(f'orig date {self.DCM.StudyDate}  orig time {self.DCM.StudyTime}',self.LOGLEVEL_HIGH)
+        self.CurrStudy.delta = self.create_dt_delta( self.DCM.StudyDate, self.DCM.StudyTime)
+        self.datasheet[ self.XLSDATA_DT_DELTA + current_row_str ] = delta_obj2str( self.CurrStudy.delta )
+        # DateTime Delta in 'days:seconds.microseconds' format
+
         # insert Logging message(s) here. Only 1 will be sent- depending on global_log_level
         if self.log( 'running: assign_next_free_studyID() in generator loop', self.LOGLEVEL_DEBUG ):
             pass
@@ -715,8 +772,7 @@ class Study_Class( ):
         else:
             self.log( f'Assigned new StudyID to {new_UID}', self.LOGLEVEL_NORMAL )
 
-
-        # Update the dict_cache.  This is a hack. Better to use in a class probably.
+        # Update the dict_cache.  Perhaps better to use in a class...
         self.xls_UID_lookup[ new_UID ] = self.next_studyID_row
 
 
@@ -729,28 +785,34 @@ class Study_Class( ):
     
 
     def deidentifyDICOM( self, newPtName = 'Anon', newPtID = 'research' ):
-
-
-        # enact FLAG based actions - need to sync this with excel file
+        '''Performs the removal of PHI
+        Including applying the DateTime delta to ALL Date, Time and DateTime VRs
+        '''
+        self.msg('->deidentityDICOM...',level='DICOM')
+        # enact FLAG based actions - need to sync this with XLS flag list
         if self.flag_dict['DEL_PRIVATE_FLAG']:
             self.DCM.remove_private_tags()
+            self.msg('removing private tags', level='DEBUG')
         
         if self.flag_dict['DEL_CURVES_FLAG']:
-             self.DCM.walk( del_curves_callback )
+            self.DCM.walk( del_curves_callback )
+            self.msg('removig curves', level='DEBUG')
 
         if self.flag_dict['CROP_US_TOPBAR_FLAG'] and self.DCM.Modality=='US':
             self.blankTopBar()
-        
-        # enact Value Representation (VR) based actions
-        def Perform_VR_Actions(dataset, data_element):
-            vr_str = data_element.VR
-            if vr_str in self.vr_actions:
-                new_val = self.vr_actions[vr_str][2]
-                if new_val == None:
-                    new_val = ""
-                data_element.value = new_val
+            self.msg('blank topbar', level='DEBUG')
 
-        self.DCM.walk(Perform_VR_Actions)
+        # dt_delta:
+        # if 'PRESERVE_PT_TIMELINE' is True, the delta will ne non-zero.
+        # delta will be applied to all DA, TM and DT value representations.
+        # delta is calculated on loading DICOM, in:
+        # ->process_file -> study.assign_next_free_studyID()
+        if self.DCM.PatientID in self.dt_delta:
+            self.delta_apply_all_tags()
+            self.msg('applying dt delta', level='DEBUG')
+
+        # enact VR based actions
+        self.DCM.walk(self.Perform_VR_Actions)
 
         # enact TAG-based actions
         for [group, element, action, repvalue] in self.tag_action_list:
@@ -767,10 +829,78 @@ class Study_Class( ):
                 if [group,element] in self.DCM:
                     del self.DCM[group,element]
 
-            if [group,element] in self.DCM:
-                new = self.DCM[group,element].value
-            else:
-                new = None
+        pass
+
+
+    # callback to enact Value Representation (VR) based actions
+    def Perform_VR_Actions(self, dataset, data_element):
+        vr_str = data_element.VR
+        if vr_str in self.vr_actions:
+            new_val = self.vr_actions[vr_str][2]
+            if new_val == None:
+                new_val = ""
+            data_element.value = new_val
+
+
+    def create_dt_delta(self, oDate_raw:str, oTime_raw:str = "000000.000000")->timedelta:
+        '''Take study date & time, and calculate delta with reference.
+        Such that newDateTime = studyDateTime + delta
+
+        Params: Take in original date & time of study as strings from XLS.
+        NB- reference datetime is study_class.REF_YEAR/MONTH/DAY/HH/MM/SS/MS
+        Return: DateTime object
+        '''
+        # delta should be in a format useable by the datetime module
+        # DICOM date format is 'yyyymmdd', older format 'yyyy:mm:dd'
+        # DICOM time format is 'HHMMSS.FFFFFF'
+        # http://dicom.nema.org/dicom/2013/output/chtml/part05/sect_6.2.html
+        oTime = remove( oTime_raw, ':.')  # strip out expected non-numerics
+        oDate = remove( oDate_raw, ':.')  
+        if not oTime:
+            oTime = "000000000000"
+        d_yyyy = int(oDate[:4])
+        d_mm = int(oDate[4:6])
+        d_dd = int(oDate[6:8])
+        t_hh = int(oTime[0:2])
+        t_mm = int(oTime[2:4])
+        t_ss = int(oTime[4:6])
+        if len(oTime[4:])>3:  # ie if the seconds contains float
+            #  Get miliseconds
+            t_ms = int( oTime[6:] )
+        else:
+            t_ms = 0
+
+        oldDateTime = datetime( year=d_yyyy, month=d_mm, day=d_dd,
+                                hour=t_hh, minute=t_mm, second=t_ss,
+                                microsecond=t_ms
+                                )
+        refDateTime = datetime( year=self.REF_YEAR,
+                        month=self.REF_MONTH,
+                        day=self.REF_DAY,
+                        hour=self.REF_HH,
+                        minute=self.REF_MM,
+                        second=self.REF_SS
+                        )
+        delta_obj = refDateTime - oldDateTime
+        return delta_obj
+
+
+    def delta_apply_all_tags(self ):
+        '''Apply the known delta to ALL date/time/datetime tags
+        Steps through all tags and changes all DA/TM/DT value representation tags
+        Delta is zero if flag is not enabled.
+
+        Params: None (just uses the Study_Class object)
+        Returns: None
+        '''
+        self.msg(f' Applying delta...', endstr='')
+        self.delta = self.dt_delta[ self.CurrStudy.PatientID ]
+        # workaround to get delta into the callback
+        # to which only the pyDICOM object is available.
+        self.DCM.preamble = delta_obj2str(self.delta)
+        # Step through all tags using the .walk pyDICOM method
+        # use a callback to process tags.
+        self.DCM.walk( delta_apply_callback )
 
 
     # ---------------------> Moved from Init_Study
@@ -816,27 +946,27 @@ class Study_Class( ):
 
         # Row 1 is the column title row
         self.datasheet['A1']  = 'Data Page'
-        self.datasheet[ self.XLSDATA_STUDYIDS  + '1']  = 'Study IDs'
-        self.datasheet[ self.XLSDATA_DATEADDED + '1']  = 'Date Added'
-        self.datasheet[ self.XLSDATA_TIMEADDED + '1']  = 'Time Added'
+        self.datasheet[ self.XLSDATA_STUDYIDS + '1'] = 'Study IDs'
+        self.datasheet[ self.XLSDATA_DATEADDED + '1'] = 'Date Added'
+        self.datasheet[ self.XLSDATA_TIMEADDED + '1'] = 'Time Added'
 
-        self.datasheet[ self.XLSDATA_PATIENTNAME  + '1'] = 'Patient Name'
-        #self.datasheet[ self.xlsData_patient_firstname + '1'] = 'First Name'
+        self.datasheet[ self.XLSDATA_PATIENTNAME + '1'] = 'Patient Name'
 
-        self.datasheet[ self.XLSDATA_PATIENTID        + '1'] = 'Patient ID'
-        self.datasheet[ self.XLSDATA_ACCESSIONNUMBER  + '1'] = 'Accession No.'
-        self.datasheet[ self.XLSDATA_STUDYDATE        + '1'] = 'Study Date'
-        self.datasheet[ self.XLSDATA_STUDYTIME        + '1'] = 'Study Time'
-        self.datasheet[ self.XLSDATA_STUDYUID         + '1'] = 'Study UID'
+        self.datasheet[ self.XLSDATA_PATIENTID + '1'] = 'Patient ID'
+        self.datasheet[ self.XLSDATA_ACCESSIONNUMBER + '1'] = 'Accession No.'
+        self.datasheet[ self.XLSDATA_STUDYDATE + '1'] = 'Study Date'
+        self.datasheet[ self.XLSDATA_STUDYTIME + '1'] = 'Study Time'
+        self.datasheet[ self.XLSDATA_DT_DELTA + '1'] = 'DateTime Delta'
+        self.datasheet[ self.XLSDATA_STUDYUID + '1'] = 'Study UID'
         self.datasheet[ self.XLSDATA_STUDYDESCRIPTION + '1'] = 'Study Description'
 
         self.logsheet['A1']   = 'Log Page'
 
-        self.logsheet[ self.XLSLOG_DATE + '1']   = 'Date'
-        self.logsheet[ self.XLSLOG_TIME + '1']   = 'Time'
-        self.logsheet[ self.XLSLOG_ACTIVITY + '1']   = 'Log Activity'
-        self.logsheet[ self.XLSLOG_USER + '1']   = 'User'
-        self.logsheet[ self.XLSLOG_COMPUTER + '1']   = 'Computer'
+        self.logsheet[ self.XLSLOG_DATE + '1'] = 'Date'
+        self.logsheet[ self.XLSLOG_TIME + '1'] = 'Time'
+        self.logsheet[ self.XLSLOG_ACTIVITY + '1'] = 'Log Activity'
+        self.logsheet[ self.XLSLOG_USER + '1'] = 'User'
+        self.logsheet[ self.XLSLOG_COMPUTER + '1'] = 'Computer'
 
         self.cfgsheet[ self.VR_Action_Col + '1' ] = 'ACTION'
         self.cfgsheet[ self.VR_Action_Col + '2' ] = '-'
@@ -902,7 +1032,7 @@ class Study_Class( ):
 
 
         
-    #------------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------
 
 
 ############### END OF STUDY_CLASS DEFINITION ###################
@@ -933,6 +1063,122 @@ def del_curves_callback(dataset, data_element):
     if data_element.tag.group & 0xFF00 == 0x5000:
         del dataset[data_element.tag]
 
+
+#---------------------------------------------------------
+#      Accessory functions related to datetime delta
+#---------------------------------------------------------
+
+def delta_apply_callback(dataset, data_element):
+    '''Callback to apply datetime delta to tags.
+    Used in deidentifyDICOM()
+    Requires knowledge of the tag VR and delta. 
+    DA = date
+    TM = time
+    DT = datetime
+    '''
+    vr = data_element.VR
+    print(f'delta_apply_callback: [{data_element}], \t\t{dataset.preamble}')
+    delta_obj = delta_str2obj(dataset.preamble)  # workaround to pass delta into this callback
+    if vr == 'DA':
+        print(f'\tdelta to DA: old= {data_element.value}', end='')
+        # convert date string into date object
+        old_date_obj = DA_str2obj( data_element.value )
+        # add delta
+        print(f' delta type={type(delta_obj)}, val={delta_obj}')
+        new_date_obj = old_date_obj + delta_obj
+        # convert back to string ('yyyymmdd')
+        # save to original data element
+        data_element.value = DA_obj2str( new_date_obj )
+        print(f'\t   new= {data_element.value}')
+        pass
+    elif vr == 'TM':
+        # convert time string into time object
+        # add delta
+        # convert back to string ('HHMMSS.FFFFFF')
+        # save to original data element
+        pass
+    elif vr == 'DT':
+        # convert datetime string into datetime object
+        # add delta
+        # convert back to string ('YYYYMMDDHHMMSS.FFFFFF') (+/- '&ZZXX' UTC info)
+        # save to original data element
+        pass
+
+
+def DT_clean( DT_str:str )->str:
+    #  Old DICOM standard allowed ':', ' ' and '.' in DA/DT/TM strings
+    #  add more if necessary for non-standard formats
+    DT_str = remove( DT_str, ':. ')
+    return DT_str
+
+
+def DA_str2obj(date_str:str)->datetime.date:
+    date_str = DT_clean( date_str )
+    yyyy = int(date_str[:4])
+    mm = int(date_str[4:6])
+    dd = int(date_str[6:8])
+    date_obj = date(year=yyyy, month=mm, day=dd)
+    return date_obj
+
+
+def DA_obj2str(date_obj:datetime.date)->str:
+    # Pad with '0' to appropriate no of digits
+    print(f'DA_obj2str: in:{date_obj}')
+    yyyy = str(date_obj.year).rjust(4,'0')
+    mm = str(date_obj.month).rjust(2,'0')
+    dd = str(date_obj.day).rjust(2,'0')
+    date_str = yyyy + mm + dd
+    return date_str
+
+
+def TM_str2obj(time_str:str)->datetime.time:
+    pass
+
+
+def TM_obj2str(time_obj:datetime.time)->str:
+    pass
+
+
+def DT_str2obj(dt_str:str)->datetime:
+    pass
+
+
+def DT_obj2str(dt_obj:datetime)->str:
+    pass
+
+
+def delta_str2obj(delta_str:str )->timedelta:
+    '''Convert string (from XLS) into timedelta object.
+    expected string format 'days:seconds.miliseconds'
+    Params: delta_str from XLS 'datetime delta' column
+    Return: timedelta object'''
+    colon = delta_str.find(':')  # should always have
+    period = delta_str.find('.')  # should have. Might vary.
+    # If no period? period=-1
+    dd = int( delta_str[ : colon] )
+    if period:
+        ds = int( delta_str[colon+1 : period] )
+        dms = int( delta_str[period+1 : ] )
+    else:
+        ds = int( delta_str[colon+1 :] )
+        dms = 0
+    delta_obj = timedelta( days=dd, seconds=ds, milliseconds=dms )
+    return delta_obj
+
+
+def delta_obj2str( delta: timedelta )->str:
+    '''Take timedelta and convert into a format for storage in XLS
+    eg. str_to_write = delta_as_string( time_delta obj )
+    Params: timedelta object
+    Return: formatted string "days:seconds.microseconds" '''
+    # class datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0)
+    # readable properties: .days .seconds .microseconds
+    days = delta.days
+    seconds = delta.seconds
+    raw_microseconds = delta.microseconds
+    ms_string = str(raw_microseconds).zfill(6)  # force string to be 6 chars for microseconds
+    delta_string = f'{days}:{seconds}.{ms_string}'
+    return delta_string
 
 ######################################################################
 
@@ -974,8 +1220,6 @@ def number_possible_IDs( format ):
             poss *= len(digitlist)
 
     return poss
-
-
 
 
 def create_rnd_studyID( format = 'lldddd', prefix='', suffix=''):
@@ -1045,4 +1289,13 @@ def combotag( group, element, outtype = 'int'):
         return hex(combotag)
 
 
+def remove( inputstr:str, the_list:str)->str:
+    '''Remove all occurences of certain characters from a string.
+    Params: Input string(str), char list(str)
+    Return: cleaned string'''
+    out_str = ""
+    for char in inputstr:
+        if char not in the_list:
+            out_str += char
+    return out_str
 
