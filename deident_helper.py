@@ -6,6 +6,7 @@ import openpyxl
 import os
 
 
+
 #####################################################################
 #                           Ops class                               #
 #####################################################################
@@ -35,12 +36,10 @@ class Ops_Class( ):
 #                         PROCESS_FILE                              #
 #####################################################################
 
-def process_file( study, filename, stats ):
+def process_file( study, filename:str, stats )->int:
 	# ----------- Try to open with pydicom
 	try:
 		study.DCM = pydicom.filereader.dcmread( filename, force=True)
-		# Blank the preamble.
-		study.DCM.preamble = b'\x00' * 128
 		
 		load_warning = ''
 		
@@ -54,41 +53,46 @@ def process_file( study, filename, stats ):
 			tag_warning.append( f'{filename} : {load_warning}' )
 
 	except:  # If exception on loading the file is prob non-DICOM
-		print('\t-pydicom load failed -skipping file-')
+		study.msg('\t-DICOM load failed')
 		stats.not_DCM_filenames.append(f'{filename}: pydicom load failed- non-dicom')
 		return False
 
-	else:  # If no exception on loading, this code runs.
-		stats.valid_DCM_file += 1
-		print('\t-DICOM- De-identify', end='')
+	stats.valid_DCM_file += 1
+	study.msg('De-identify', endstr='')
 
-		# this returns False if there is no StudyInstanceUID tag
-		study.test_study_UID = study.get_DCM_StudyInstanceUID( )
+	# this returns False if there is no StudyInstanceUID tag
+	study.test_study_UID = study.get_DCM_StudyInstanceUID( )
 
-        # Maybe redundant after the 'for tag in study.DCM_TAG_CHECKLIST:' loop above
-		if not study.test_study_UID:
-			stats.skipped_dcm_filenames.append(f'{filename} -No studyUID')
-			print(' -No StudyInstanceUID tag  -skipped file-')
-			return False
+	# test for self.DCM.StudyTime tag- if absent, make one
+	if 'StudyTime' not in study.DCM:
+		study.DCM.StudyTime = "000000"
 
-		# Check if StudyInstanceUID has match in cache
-		if study.test_study_UID in study.xls_UID_lookup:
-			# retrieve the previous studyID linked to the UID
-			AnonID = study.get_old_study_attrib_from_UID(
-				study.XLSDATA_STUDYIDS,
-				study.test_study_UID
-				)
-			print(f' - Known UID, using {AnonID}')
-		else:
-			# If UNIQUE study UID ie. not in cache
-			AnonID = study.assign_next_free_studyID( )
-			print(f' - Unique UID - Assigning {AnonID}')
-			
-		# Perform deidentification on loaded DICOM data
-		study.deidentifyDICOM(study.CurrStudy.AnonName, AnonID )
+	# update the values in study.CurrStudy class
+	study._update_fromDCM()
 
-		# Write de-identified DICOM to disc
-		study.DCM.save_as(study.CurrStudy.savefilename, write_like_original=True)
+	# Check if StudyInstanceUID has match in cache
+	if study.test_study_UID in study.xls_UID_lookup:
+		# retrieve the previous studyID linked to the UID
+		study.CurrStudy.AnonID = study.get_old_study_attrib_from_UID(
+			study.XLSDATA_STUDYIDS,
+			study.test_study_UID
+			)
+		print(f' - Known UID, using {study.CurrStudy.AnonID}')
+	else:
+		# If UNIQUE study UID ie. not in cache
+		study.CurrStudy.AnonID = study.assign_next_free_studyID( )
+		print(f' - Unique UID - Assigning {study.CurrStudy.AnonID}')
+
+	# Perform deidentification on loaded DICOM data
+	study.deidentifyDICOM(study.CurrStudy.AnonName, study.CurrStudy.AnonID )
+	
+	# Blank the preamble.
+	study.DCM.preamble = study.NEW_PREAMBLE
+
+	# Write de-identified DICOM to disc
+	study.DCM.save_as(study.CurrStudy.savefilename, write_like_original=True)
+
+	return True
 
 
 #---------------------------------------------------------------------------
@@ -114,9 +118,22 @@ def check_DICOM_fourCC( filename ):
 	if line == "DICM":
 		return True
 	else:
-		print('\tfourcc says not DICOM -skipping file-')
 		return False
 
 
-	
+def try_dcm_attrib( study, attrib_str, failure_value ):
+	'''
+	PYDICOM crashes if the queried data element is not present. Often happens in some anonymised DICOMs.
+	This is a quick & dirty but 'safe' method to query and return something.
+	Usage: some_var = <>.try_dcm_attrib( <attribute string>, <failure string> )
+	Returns: on success returns the value held in the DICOM object attribute provided.
+		On failure, returns the failure string.
+	'''
+	try:
+			value = self.DCM.data_element( attrib_str ).value
+	except:
+			value = failure_value
+
+	return value
+
 

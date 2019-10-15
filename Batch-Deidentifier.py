@@ -133,7 +133,7 @@ study.msg(f'\nFound {files} files in {dirs} directories.\n')
 #loop through all the folders/files in file_paths[]
 # each file/path listed is set as rootDir 
 for rootDir in file_paths:
-	study.msg(f'Current root directory: {rootDir}')
+	study.msg(f'{rootDir}\\')
 	
 	# If the IRB code is set then use that as anonymised pt name
 	if study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value:
@@ -174,42 +174,49 @@ for rootDir in file_paths:
 
 		# loop through each file in current directory
 		for fname in fileList:
+			study.CurrStudy.clean()
 			study.CurrStudy.testfilename = f'{dirName}\\{fname}'
 			study.CurrStudy.savefilename = f'{dirNameAnon}\\{fname}'
 
-			study.msg(f'\t{fname} ...', endstr='\t')
+			fname_str = "'" + fname + "'"
+			study.msg(f"\t{fname_str.ljust(30,' ')} ", endstr='')
 
 			# --------------- Check file before processing
 			# File in skip list?
 			if fname in study.SKIP_LIST:
 				stats.skipped_dcm_filenames.append( fname )
-				study.msg(' -on skiplist-')
+				study.msg(' -on ignore list-')
+				stats.ignored += 1
 				continue
 
 
 			# Check 'fourcc' (bytes from 128 to 132) = "DICM"
 			DICOM = check_DICOM_fourCC( study.CurrStudy.testfilename )
 			if not DICOM:
-				study.msg('-No DICOM fourCC -skipping file-')
+				study.msg('Invalid DICOM: Missing fourCC')
 				stats.not_DCM_filenames.append(f'{fname}: fourcc failed-> non-dicom')
+				stats.nondicom += 1
 				continue
 			
 			# The meat & bones of deidentification goes on here
 			# Would like to remove stats arg- maybe include as returned value
 			processOK = process_file( study, study.CurrStudy.testfilename, stats )  
-			if not processOK:
+			if processOK:
+				stats.anonok += 1
+			else:
 				# process_file() returns True if deidentified OK
 				# otherwise returns False.
 				# Not strictly needed if this is the last in file loop
-				continue
+				stats.anonfailed += 1
 
 
 	# Stats on rootDir completion----
 	#update_stats_done_rootDir( subdirList, fileList )
 
-	study.msg(f'Completed: {rootDir}')
-	study.msg(f'DICOMs Anonymised:\t{stats.anonok} OK, {stats.anonfailed} failed' )
-	study.msg(f'Non-DICOMs Copied:\t{stats.copyOK} OK, {stats.copyfailed} failed' )
+	study.msg('\n')
+	study.msg(f'\tDICOMs Anonymised:\t{stats.anonok} OK, {stats.anonfailed} failed' )
+	study.msg(f'\tFiles ignored: {stats.ignored}')
+	study.msg(f'\tNon-DICOM: {stats.nondicom}' )
 
 
 if stats.all_dir_count > 1:

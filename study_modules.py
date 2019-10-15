@@ -209,6 +209,10 @@ class Study_Class( ):
     flag_dict = {}  # index will be the flag name, contains set value from XLS
     flag_cell = {}
 
+    tag_default = [  # for insertion into XLS on creation. Default tag list
+                    '0008', '0010', 'REPLACE', 'repvalue'
+    ]
+
     
     dt_delta = {}  #  Date Time Delta dictionary.
 
@@ -897,7 +901,9 @@ class Study_Class( ):
         self.delta = self.dt_delta[ self.CurrStudy.PatientID ]
         # workaround to get delta into the callback
         # to which only the pyDICOM object is available.
-        self.DCM.preamble = delta_obj2str(self.delta)
+        # preamble does not work- is not included in series
+        global global_delta_obj
+        global_delta_obj = self.delta
         # Step through all tags using the .walk pyDICOM method
         # use a callback to process tags.
         self.DCM.walk( delta_apply_callback )
@@ -1076,16 +1082,16 @@ def delta_apply_callback(dataset, data_element):
     TM = time
     DT = datetime
     '''
+    global global_delta_obj
     vr = data_element.VR
-    print(f'delta_apply_callback: [{data_element}], \t\t{dataset.preamble}')
-    delta_obj = delta_str2obj(dataset.preamble)  # workaround to pass delta into this callback
+    print(f'delta_apply_callback: [{data_element}], \t\t{global_delta_obj}')
     if vr == 'DA':
         print(f'\tdelta to DA: old= {data_element.value}', end='')
         # convert date string into date object
         old_date_obj = DA_str2obj( data_element.value )
         # add delta
-        print(f' delta type={type(delta_obj)}, val={delta_obj}')
-        new_date_obj = old_date_obj + delta_obj
+        print(f' delta type={type(global_delta_obj)}, val={global_delta_obj}')
+        new_date_obj = old_date_obj + global_delta_obj
         # convert back to string ('yyyymmdd')
         # save to original data element
         data_element.value = DA_obj2str( new_date_obj )
