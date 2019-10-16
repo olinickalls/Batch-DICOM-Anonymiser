@@ -1084,8 +1084,10 @@ def delta_apply_callback(dataset, data_element):
     '''
     global global_delta_obj
     vr = data_element.VR
-    print(f'delta_apply_callback: [{data_element}], \t\t{global_delta_obj}')
+    print(f'delta_apply_callback: [{str(data_element).ljust(57)}], \t\t{global_delta_obj}')
     if vr == 'DA':
+        if data_element.value =='':
+            return  # no change if empty
         print(f'\tdelta to DA: old= {data_element.value}', end='')
         # convert date string into date object
         old_date_obj = DA_str2obj( data_element.value )
@@ -1096,13 +1098,19 @@ def delta_apply_callback(dataset, data_element):
         # save to original data element
         data_element.value = DA_obj2str( new_date_obj )
         print(f'\t   new= {data_element.value}')
-        pass
     elif vr == 'TM':
+        if data_element.value =='':
+            return  # no change if empty
         # convert time string into time object
+        old_time_obj = TM_str2obj( data_element.value )
+        print(f'\tdelta to TM: old= {data_element.value}', end='')
         # add delta
+        print(f' delta type={type(global_delta_obj)}, val={global_delta_obj}')
+        new_time_obj = old_time_obj + global_delta_obj
         # convert back to string ('HHMMSS.FFFFFF')
         # save to original data element
-        pass
+        data_element.value = TM_obj2str( new_date_obj )
+        print(f'\t   new= {data_element.value}')
     elif vr == 'DT':
         # convert datetime string into datetime object
         # add delta
@@ -1138,7 +1146,29 @@ def DA_obj2str(date_obj:datetime.date)->str:
 
 
 def TM_str2obj(time_str:str)->datetime.time:
-    pass
+    '''Take TM string "HHMMSS.FFFFFF" and convert to datetime.time object
+    Params: String "HHMMSS.FFFFFF"
+    Return: datetime.time object'''
+    if type(time_str) != str:
+        raise(f"TM_str2obj: received non-str input of type {type(time_str) val={time_str}")
+    elif len(time_str) < 6:
+        raise(f"TM_str2obj: received invalid DICOM TM string:'{time_str}'")
+
+    # Parse TM time string
+    hh = int(time_str[0:2])
+    mm = int(time_str[2:4])
+    ss = int(time_str[4:6])
+    if time_str.find('.') and len(time_str) > 7:
+        ff = int( time_str[time_str.find('.')+1:].ljust(6,'0') )
+    else:
+        ff = 0
+    # Create time object for time_str 
+    time_obj = time( hour = hh,
+                        minute = mm,
+                        second = ss,
+                        microsecond = ff
+    )
+    return time_obj
 
 
 def TM_obj2str(time_obj:datetime.time)->str:
