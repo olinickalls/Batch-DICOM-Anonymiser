@@ -1,0 +1,84 @@
+FLOW
+
+INIT:
+
+Parse CMD line args
+
+Create Study_Class object
+
+Get the current .py file dir- Change CWD to this dir
+
+Open .XLSX file
+ --> study.load_xls() method
+    Try save - check write access
+    XLSX basic validity check - Are the basic sheets present?
+    If valid then load settings:
+    --> study.import_xls_settings() method
+        Create worksheet shortcuts
+        Find first available row
+        Cache used UIDs
+        Cache dt deltas
+
+        set next studyID row
+
+        read XLSX config data (Flags)
+        read XLSX config data (VR actions)  ---> move to separate method ._import_VR_actions
+        read XLSX config data (Tag actions) ---> move to separate method ._import_tag_actions
+    
+Create base folder with 'anon-' prefix
+Iterate through folders list:
+    Create folder
+    Iterate through file list:
+        Check is not to be ignored (ignorelist)
+        Has DICOM fourcc? (DICM in the right place) (if not then skip)
+        -Should now only have 'valid' DICOM files.
+
+        process_file()  -->  refactor this in to the study_Class as method
+
+Save .XLSX
+print stats at the end.
+
+
+===============================
+PROCESS_FILE:
+
+Attempt to open DICOM file.  (If error on load then fail with error)
+Get StudyUID
+If no StudyTime tag then make one
+Copy main DICOM tag info into the study_Class object
+ --> study._update_fromDCM
+     PtID, StudyInstanceUID
+     Looks up delta- makes on if not present.
+
+Check if new siUID is in cache.
+    If so, pull the deidUID and continue
+    IF not, 
+     --> study.assign_new_si_UID()
+
+Enter current DCM data into XLS
+
+Deidentify ---> deidentifyDICOM()
+
+replace the preamble (should move into deidentify method)
+
+
+===============================
+DeidentifyDICOM()
+
+1- FLAG actions
+    - Remove Private Tag
+    - Delete Curves
+    - Crop US topbar
+    (delta not currently implemented)
+
+2- VR based actions
+    - study.Perform_VR_Actions()
+    ---> .Perform_VR_Actions()
+        
+              
+
+3- TAG based actions
+    - Does tag exist in this DCM?
+    - If 'replace' AND exists:
+        replace
+        

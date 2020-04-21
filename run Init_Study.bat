@@ -7,7 +7,7 @@ rem python Init_Study.py -h
 @echo ----------------------------------------------
 
 
-python Init_Study.py "zzztest" -t "study to look at stuff" -n 5000 -prefix TEST- -suffix END -format llddd
+python InitStudy.py "zzztest" -t "study to look at stuff" -n 5000 -prefix TEST- -suffix END -format llddd
 
 
 

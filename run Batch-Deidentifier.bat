@@ -4,6 +4,6 @@
 
 @echo Executing python code...
 
-python "Batch-Deidentifier.py" -x my_study.xlsx %*
+python "Batch-Deidentifier.py" -x demo.xlsx %*
 
 @pause
