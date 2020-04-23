@@ -104,7 +104,7 @@ os.chdir(parent)
 # study.xls_filename = 'my_study.xlsx'
 if args.xlsfilename == "":
     print("No XLSX file specified. Defaulting to 'demo.xlsx'")
-    args.filename = "demo.xlsx"
+    args.filename = "my_study.xlsx"
 study.xls_filename = args.xlsfilename
 
 study.msg('Reading input files...\n')
@@ -190,7 +190,7 @@ for baseDir in file_paths:
             study.CurrStudy.savefilename = f'{dirNameAnon}\\{fname}'
 
             fname_str = "'" + fname + "'"
-            study.msg(f"\t{fname_str.ljust(30,' ')} ", endstr='')
+            study.msg(f"\n\t{fname_str.ljust(30,' ')} ", endstr='')
 
             # --------------- Checks before deidentifying
             # File in skip list?
@@ -203,20 +203,19 @@ for baseDir in file_paths:
             # Check 'fourCC' (bytes from 128 to 132) = "DICM"
             DICOM_fourCC = check_fourCC(study.CurrStudy.testfilename)
             if not DICOM_fourCC:
-                study.msg('Invalid DICOM: Missing or wrong fourCC')
+                study.msg('Invalid DICOM: Missing or wrong fourCC', endstr='')
                 stats.not_DCM_filenames.append(f'{fname}: non-dicom fourcc')
                 stats.nondicom += 1
                 continue
 
+            study.msg('Deidentify: ', endstr='')
+
             # The meat & bones of deidentification goes on here
-            # Would like to remove stats arg- maybe include as returned value
             deidOK = process_file(study, study.CurrStudy.testfilename)
             if deidOK:
                 stats.anonok += 1
             else:
-                # process_file() returns True if deidentified OK
-                # otherwise returns False.
-                # Not strictly needed if this is the last in file loop
+                print('Load Failed...')
                 stats.anonfailed += 1
 
     # Stats on baseDir completion----

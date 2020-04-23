@@ -107,8 +107,9 @@ class FileStats_Class():
 
 
 class BasicDetails():
-    AnonName = ""
-    AnonID = ""
+    # AnonName = ""
+    AnonPtID = ""
+    AnonUID = ""
     PatientID = ""
     StudyInstanceUID = ""
     delta = None
@@ -117,8 +118,9 @@ class BasicDetails():
     savefilename = ""
 
     def clean(self):
-        self.AnonName = ""
-        self.AnonID = ""
+        # self.AnonName = ""
+        self.AnonPtID = ""
+        self.AnonUID = ""
         self.PatientID = ""
         self.StudyInstanceUID = ""
         self.delta = None
@@ -149,10 +151,16 @@ class Study_Class():
     XLSFRONT_PI_CELL = 'B3'
     XLSFRONT_IRB_CODE_CELL = 'B4'
     XLSFRONT_NUMBER_OF_STUDYIDS_CELL = 'B5'
+    XLSFRONT_DEID_PTID_FORMAT = 'B7'
+    XLSFRONT_DEID_PTID_PREFIX = 'B8'
+    XLSFRONT_DEID_PTID_DIGITS = 'B9'
+    XLSFRONT_DIROUTBY_PTID_CELL = 'B11'
+
+    XLSFRONT_ORIG_FILENAMES_CELL = 'B13'
 
     XLSDATA_DEIDUID = 'B'
     XLSDATA_DEIDPTID = 'C'
-    XLSDATA_DEIDPTNAME = 'D'
+    # XLSDATA_DEIDPTNAME = 'D'
     XLSDATA_DATEADDED = 'E'
     XLSDATA_TIMEADDED = 'F'
     XLSDATA_PATIENTNAME = 'H'
@@ -224,63 +232,63 @@ class Study_Class():
         '<bar height in pixels>',  # Crop topbar in US image by 65
         '<yyyymmdd>',  # default date
         '<hhmmss.ff>',  # default time
-        '<reference datetime>'  # Maintain timeline for each patient by using a datetime delta
+        '<reference datetime>'  # Maintain pt timeline by datetime delta
         ]
     flag_dict = {}  # index will be the flag name, contains set value from XLS
     flag_cell = {}
 
     tag_default = [  # for insertion into XLS on creation. Default tag list
                      # list from Aryanto et. al. Eur Radiol (2015) 25:3685–3695
-                    '0008', '0020', 'REPLACE', '20150701',
-                    '0008', '0021', 'REPLACE', '20150701',
-                    '0008', '0022', 'REPLACE', '20150701',
-                    '0008', '0023', 'REPLACE', '20150701',
-                    '0008', '0024', 'REPLACE', '20150701',
-                    '0008', '0025', 'REPLACE', '20150701',
-                    '0008', '002A', 'REPLACE', '20150701',
-                    '0008', '0030', 'REPLACE', '120000',
-                    '0008', '0031', 'REPLACE', '120000',
-                    '0008', '0032', 'REPLACE', '120000',
-                    '0008', '0033', 'REPLACE', '120000',
-                    '0008', '0034', 'REPLACE', '120000',
-                    '0008', '0035', 'DELETE', '',
-                    '0008', '0050', 'REPLACE', 'accession1234',
-                    '0008', '0080', 'REPLACE', 'St Elsewhere',
-                    '0008', '0081', 'DELETE', '',
-                    '0008', '0090', 'DELETE', '',
-                    '0008', '0092', 'DELETE', '',
-                    '0008', '0094', 'DELETE', '',
-                    '0008', '0096', 'DELETE', '',
-                    '0008', '1040', 'REPLACE', 'radiology',
-                    '0008', '1048', 'DELETE', '',
-                    '0008', '1049', 'DELETE', '',
-                    '0008', '1050', 'DELETE', '',
-                    '0008', '1052', 'DELETE', '',
-                    '0008', '1060', 'DELETE', '',
-                    '0008', '1062', 'DELETE', '',
-                    '0008', '1070', 'DELETE', '',
-                    '0010', '0010', 'REPLACE', 'Anon Pt',
-                    '0010', '0020', 'REPLACE', 'Anon ID',
-                    '0010', '0021', 'DELETE', '',
-                    '0010', '0030', 'REPLACE', '20000101',
-                    '0010', '0032', 'REPLACE', '070000',
-                    '0010', '0040', 'REPLACE', 'anon gender',
-                    '0010', '1000', 'DELETE', '',
-                    '0010', '1001', 'DELETE', '',
-                    '0010', '1005', 'DELETE', '',
-                    '0010', '1010', 'REPLACE', '25',
-                    '0010', '1040', 'DELETE', '',
-                    '0010', '1060', 'DELETE', '',
-                    '0010', '2150', 'DELETE', '',
-                    '0010', '2152', 'DELETE', '',
-                    '0010', '2154', 'DELETE', ''
-                    '0020', '0010', 'REPLACE', 'Anon Study ID',
-                    '0038', '0300', 'DELETE', '',
-                    '0038', '0400', 'DELETE', '',
-                    '0040', 'A120', 'DELETE', '',
-                    '0040', 'A120', 'DELETE', '',
-                    '0040', 'A120', 'DELETE', '',
-                    '0040', 'A120', 'DELETE', ''
+                    ['0x0008', '0x0020', 'REPLACE', '20150701'],
+                    ['0008', '0021', 'REPLACE', '20150701'],
+                    ['0008', '0022', 'REPLACE', '20150701'],
+                    ['0008', '0023', 'REPLACE', '20150701'],
+                    ['0008', '0024', 'REPLACE', '20150701'],
+                    ['0008', '0025', 'REPLACE', '20150701'],
+                    ['0008', '002A', 'REPLACE', '20150701'],
+                    ['0008', '0030', 'REPLACE', '120000'],
+                    ['0008', '0031', 'REPLACE', '120000'],
+                    ['0008', '0032', 'REPLACE', '120000'],
+                    ['0008', '0033', 'REPLACE', '120000'],
+                    ['0008', '0034', 'REPLACE', '120000'],
+                    ['0008', '0035', 'DELETE', ''],
+                    ['0008', '0050', 'REPLACE', 'accession1234'],
+                    ['0008', '0080', 'REPLACE', 'St Elsewhere'],
+                    ['0008', '0081', 'DELETE', ''],
+                    ['0008', '0090', 'DELETE', ''],
+                    ['0008', '0092', 'DELETE', ''],
+                    ['0008', '0094', 'DELETE', ''],
+                    ['0008', '0096', 'DELETE', ''],
+                    ['0008', '1040', 'REPLACE', 'radiology'],
+                    ['0008', '1048', 'DELETE', ''],
+                    ['0008', '1049', 'DELETE', ''],
+                    ['0008', '1050', 'DELETE', ''],
+                    ['0008', '1052', 'DELETE', ''],
+                    ['0008', '1060', 'DELETE', ''],
+                    ['0008', '1062', 'DELETE', ''],
+                    ['0008', '1070', 'DELETE', ''],
+                    ['0010', '0010', 'REPLACE', 'Anon Pt'],
+                    ['0010', '0020', 'REPLACE', 'Anon ID'],
+                    ['0010', '0021', 'DELETE', ''],
+                    ['0010', '0030', 'REPLACE', '20000101'],
+                    ['0010', '0032', 'REPLACE', '070000'],
+                    ['0010', '0040', 'REPLACE', 'anon gender'],
+                    ['0010', '1000', 'DELETE', ''],
+                    ['0010', '1001', 'DELETE', ''],
+                    ['0010', '1005', 'DELETE', ''],
+                    ['0010', '1010', 'REPLACE', '25'],
+                    ['0010', '1040', 'DELETE', ''],
+                    ['0010', '1060', 'DELETE', ''],
+                    ['0010', '2150', 'DELETE', ''],
+                    ['0010', '2152', 'DELETE', ''],
+                    ['0010', '2154', 'DELETE', ''],
+                    ['0020', '0010', 'REPLACE', 'Anon Study ID'],
+                    ['0038', '0300', 'DELETE', ''],
+                    ['0038', '0400', 'DELETE', ''],
+                    ['0040', 'A120', 'DELETE', ''],
+                    ['0040', 'A121', 'DELETE', ''],
+                    ['0040', 'A122', 'DELETE', ''],
+                    ['0040', 'A123', 'DELETE', '']
     ]
 
     dt_delta = {}  # Date Time Delta dictionary.
@@ -288,6 +296,7 @@ class Study_Class():
     xls_UID_lookup = {}
     test_study_UID = ''
     xls_ID_lookup = {}
+    next_deid_ID = 0  # Keep this zero default- used as a check
 
     first_datarow = 2  # start row of actual data in XLS
     next_log_row = 0
@@ -300,6 +309,7 @@ class Study_Class():
 
     # log levels: debug = 3, high = 2, normal = 1
     # This should reflect the default, then over-ridden by cmd line options.
+    # Do not change- hardcoded in log() method
     LOGLEVEL_NORMAL = 1
     LOGLEVEL_HIGH = 2
     LOGLEVEL_DEBUG = 3
@@ -375,10 +385,15 @@ class Study_Class():
             print(f'__init__ flag_dict[{item}] = {self.flag_dict[item]}')
 
     def _update_fromDCM(self):
-        # self.CurrStudy.AnonName = ""  # Not yet created
-        # self.CurrStudy.AnonID = ""  # Not yet created
+        self.CurrStudy.AnonPtID = ""
+        self.CurrStudy.AnonUID = ""
         self.CurrStudy.PatientID = self.DCM.PatientID
         self.CurrStudy.StudyInstanceUID = self.DCM.StudyInstanceUID
+
+        # If StudyTime tag is absent, make one
+        if 'StudyTime' not in self.DCM:
+            self.DCM.StudyTime = "000000"
+
         # If this pt has no cached delta, then create one.
         if self.CurrStudy.PatientID in self.dt_delta:
             self.CurrStudy.delta = self.dt_delta[self.CurrStudy.PatientID]
@@ -392,25 +407,14 @@ class Study_Class():
         Usage: study_workbook = load_study_xls( <filename> )
         Returns: openpyxl XLS workbook object
         """
-        # mini-__init__
         self.xls_UID_lookup = {}  # new lookup dict for study UIDs
         valid = True  # until proven false
         validity_msg = ""  # info about errors as we find them
 
-        # Test for openpyxl failing to open XLS file
-        try:
-            self.XLS = openpyxl.load_workbook(xls_filename)
-        except:  # noqa -Capture any failure to load
-            print(f'load_xls: {xls_filename} failed to load. FATAL ERROR')
-            raise
+        self._load_xls_real(xls_filename)
 
         # Test actually saving the XLS file before proceeding.
-        try:
-            self.XLS.save(xls_filename)
-        except:  # noqa -Capture ANY failure
-            print(f'{xls_filename} save failed - ?permission denied.')
-            print('Is the file open in excel?.\nPlease unlock and try again.')
-            raise
+        self._save_xls_real(xls_filename)
 
         # -------------------   Validity Checks here -----------
         if 'Front' not in self.XLS.sheetnames:
@@ -439,6 +443,30 @@ class Study_Class():
             print(f'load_xls: {xls_filename} failed checks. FATAL ERROR')
             return False
 
+    def _load_xls_real(self, filename):
+        # Test for openpyxl failing to open XLS file
+        try:
+            self.XLS = openpyxl.load_workbook(filename)
+        except PermissionError:
+            print(f'load_xls: {filename} failed to load')
+            print(' -- PERMISSION ERROR -- FATAL ERROR')
+            raise
+        except:  # noqa -Capture any failure to load
+            print(f'load_xls: {filename} failed to load. FATAL ERROR')
+            raise
+
+    def _save_xls_real(self, filename):
+        try:
+            self.XLS.save(filename)
+        except PermissionError:
+            print(f'{filename} save failed - Permission Error.')
+            print('Is the file open in excel?.\nPlease unlock and try again.')
+            raise
+        except:  # noqa -Capture ANY other failure
+            print(f'{filename} save failed - Other error.')
+            print('Please report error with this full message.')
+            raise
+
     # ####################################
 
     def import_xls_settings(self):
@@ -452,7 +480,8 @@ class Study_Class():
 
         self.cache_used_UIDs()
         self.cache_dt_delta()
-        # todo: cache_deidptnames()
+        # todo: cache_deidptIDs()
+        self.cache_used_deidptIDs()
 
         self.next_studyID_row = self.first_available_studyID_row()
 
@@ -507,8 +536,182 @@ class Study_Class():
             rowstr = str(row)
             action = self.cfgsheet[self.Tag_Action_Col + rowstr].value
 
+    def _saveDCM(self):
+        """
+        Saves DICOM file.
+        Allows:
+         - arrangement by [deident] ptID folders, or
+           unchanged dir structure.
+         - keep original filename or
+           use <deident_siUID>.DCM as filename
+
+        Duplicate filenames appended by _n
+
+        Currently only original save structure implemented.
+        -Add XLSX option DIR style and FILENAME option
+        -Add read option & set flag
+        -Implement at dir creation (create or not)
+        -Implement at save DCM (create correct savepath)
+        """
+        self.DCM.save_as(self.CurrStudy.savefilename, write_like_original=True)
+        pass
+
     # ----------------------------------------------------------------------
-    # Create new 'blank' XLS. Does not load a blank XLS to do this.
+
+    def _get_deid_data(self):
+        """
+        Look up deid UID and Pt ID.
+        If Pt or UID already exist then assign the given UID/Pt ID
+        ELse assign a new one.
+        """
+        # print(' ._get_DEID_data: ', end='')
+        # 1. Check PtID
+        if self.DCM.PatientID in self.xls_ID_lookup:
+            self.CurrStudy.AnonPtID = self.xls_ID_lookup[self.DCM.PatientID]
+            print(f'using deid_PtID={self.CurrStudy.AnonPtID}', end='')
+        else:
+            self.assign_deid_ptID()
+            # print(f'New deid PtID={self.CurrStudy.AnonPtID}')
+
+        # 2. Check StudyInstanceUID
+        if self.CurrStudy.StudyInstanceUID in self.xls_UID_lookup:
+            self.CurrStudy.AnonUID = self.get_old_study_attrib_from_UID(
+                self.XLSDATA_DEIDUID,
+                self.DCM.StudyInstanceUID  # check_si_UID
+                )
+            print(f' - Known UID, using {self.CurrStudy.AnonUID}')
+        else:
+            # If UNIQUE study UID ie. not in cache
+            self.CurrStudy.AnonUID = self.assign_new_si_UID()
+            print(f' - Unique UID - Assigning {self.CurrStudy.AnonUID}')
+
+    def assign_deid_ptID(self):
+        """
+        Lazy method to find largest deid_ptID- do only when 1st called
+        Sort through the existing list of deid_ptIDs
+        and generate the next logical deid_ptID.
+        deid_ptID format: <prefix><int padded to n digits>
+            e.g. 'pt000004' or 'deid00092735'
+            <prefix> and padding defined in XLS frontpage.
+        """
+        n_len = int(self.frontsheet[self.XLSFRONT_DEID_PTID_DIGITS].value)
+        prefix = self.frontsheet[self.XLSFRONT_DEID_PTID_PREFIX].value
+        prefix_length = len(prefix)
+
+        if self.next_deid_ID == 0:  # ie never updated
+            high_ptno = 0
+
+            for realID in self.xls_ID_lookup:
+                deidID = self.xls_ID_lookup[realID]
+                number = int(deidID[prefix_length])
+                if number > high_ptno:
+                    high_ptno = number
+            self.next_deid_ID = high_ptno + 1
+        else:
+            self.next_deid_ID += 1
+
+        num_str = str(self.next_deid_ID).zfill(n_len)
+        self.CurrStudy.AnonPtID = prefix + num_str
+        self.xls_ID_lookup[self.CurrStudy.PatientID] = self.CurrStudy.AnonPtID
+        self.msg(f'assigned pt={self.CurrStudy.AnonPtID}', endstr='')
+        return self.CurrStudy.AnonPtID
+
+    def assign_new_si_UID(self):  # XLS openpyxl workbook object
+        '''
+        Returns the new studyID, and populates current
+        DCM data into corresponding datasheet row & logs made
+        and iterates down the studyID list with each new call.
+        Built-in check to see if exceeded number of valid studyIDs
+        '''
+        # todo: rename .next_studyID_row to .next_siUID_row
+        # todo: rename .first_available_studyID_row() to .first_available_siUID_row()
+        # todo: rename new_studyID to new_siUID
+        # todo: rename no_of_studyIDs to no_of_siUIDs
+        # todo: rename XLSFRONT_NUMBER_OF_STUDYIDS_CELL to XLSFRONT_NUMBER_OF_siUIDS_CELL
+
+        self.log('running: assign_new_si_UID()', self.LOGLEVEL_DEBUG)
+
+        # If this is the 1st time running then do this
+        if self.next_studyID_row == 0:
+            self.next_studyID_row = self.first_available_studyID_row()
+
+        new_studyID = self.datasheet[self.XLSDATA_DEIDUID +
+                                     str(self.next_studyID_row)].value
+        new_UID = self.DCM.StudyInstanceUID
+        no_of_studyIDs = self.frontsheet[
+            self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL].value
+
+        # Check to see if we have exceeded available StudyIDs
+        if self.next_studyID_row > (no_of_studyIDs + 1) and (
+                                                          new_studyID is None):
+            self.log('<obj>.assign_nw_si_UID: Run out of siUIDs' +
+                     'in the xls file!!!', self.LOGLEVEL_NORMAL)
+            return False
+        elif self.next_studyID_row > (no_of_studyIDs + 1) and (
+                                                      new_studyID is not None):
+            # There is a mismatch-
+            self.log(f'<>.assign_new_si_ID: WARNING -- ' +
+                     f'next_studyID_row ({self.next_studyID_row}) is more ' +
+                     f'than no_of_studyIDs ({no_of_studyIDs}) but XLScell ' +
+                     f'is non-empty ({new_studyID}) -We assume a valid value',
+                     self.LOGLEVEL_NORMAL)
+
+        # Populate current DCM data into XLS datasheet studyID into
+        dateobject = datetime.now()
+        xls_row = str(self.next_studyID_row)
+
+        dateadded = str(dateobject.strftime('%d-%m-%Y'))
+        timeadded = str(dateobject.strftime('%H:%M:%S'))
+        self.datasheet[self.XLSDATA_DATEADDED + xls_row] = dateadded
+        self.datasheet[self.XLSDATA_TIMEADDED + xls_row] = timeadded
+
+        ptID = str(self.try_dcm_attrib('PatientID', 'Nil'))
+        ptName = str(self.try_dcm_attrib('PatientName', 'Nil'))
+        self.datasheet[self.XLSDATA_PATIENTID + xls_row] = ptID
+        self.datasheet[self.XLSDATA_PATIENTNAME + xls_row] = ptName
+
+        deidID = self.CurrStudy.AnonPtID
+        self.datasheet[self.XLSDATA_DEIDPTID + xls_row] = deidID
+
+        accession = str(self.try_dcm_attrib('AccessionNumber', 'Nil'))
+        self.datasheet[self.XLSDATA_ACCESSIONNUMBER + xls_row] = accession
+
+        studydate = str(self.try_dcm_attrib('StudyDate', 'Nil'))
+        self.datasheet[self.XLSDATA_STUDYDATE + xls_row] = studydate
+        studytime = str(self.try_dcm_attrib('StudyTime', 'Nil'))
+        self.datasheet[self.XLSDATA_STUDYTIME + xls_row] = studytime
+        studyuid = str(self.try_dcm_attrib('StudyInstanceUID', 'Nil'))
+        self.datasheet[self.XLSDATA_STUDYUID + xls_row] = studyuid
+        studydesc = str(self.try_dcm_attrib('StudyDescription', 'Nil'))
+        self.datasheet[self.XLSDATA_STUDYDESCRIPTION + xls_row] = studydesc
+
+        self.CurrStudy.delta = self.create_dt_delta(self.DCM.StudyDate,
+                                                    self.DCM.StudyTime)
+        delta = delta_obj2str(self.CurrStudy.delta)
+        self.datasheet[self.XLSDATA_DT_DELTA + xls_row] = delta
+        # DateTime Delta in 'days:seconds.microseconds' format
+
+        # insert Logging message(s) here. Only 1 will be sent
+        # - depending on global_log_level
+        if self.log('running: assign_new_si_si_UID() in generator loop',
+                    self.LOGLEVEL_DEBUG):
+            pass
+        elif self.log(f'Assigned {new_studyID} to ' +
+                      f'{self.try_dcm_attrib("PatientID", "No_ID") }',
+                      self.LOGLEVEL_HIGH):
+            pass
+        else:
+            self.log(f'Assigned new StudyID to {new_UID}',
+                     self.LOGLEVEL_NORMAL)
+
+        # Update the dict_cache.  Perhaps better to use in a class...
+        self.xls_UID_lookup[new_UID] = self.next_studyID_row
+
+        # Increment next_studyID_row to point to the next row
+        self.next_studyID_row += 1
+
+        # return the new studyID string
+        return new_studyID
 
     def new_XLS(self):
         self.XLS = openpyxl.Workbook()
@@ -578,48 +781,47 @@ class Study_Class():
             # raw_dt_delta = self.datasheet[ self.XLSDATA_DT_DELTA + rs].value
 
         self.log(f'self.cache_existing_xls_UIDs: Completed OK. Found&cached ' +
-                 '{len(self.xls_UID_lookup)} existing UIDs.  Final row={row}',
+                 f'{len(self.xls_UID_lookup)} existing UIDs.  Final row={row}',
                  self.LOGLEVEL_HIGH)
         return True
 
-    def cache_used_ptids(self):
-        """Identifies each stored deidentified pt IDs
-        -caches both DeId and Real pt IDs in a dictionary.
-        - Real ID is key, and DeId ID is value.
-        Usage: <studyobj>.cache_existing_xls_UIDs()\n
-        Returns:  True (no probs), False (error)
+    def cache_used_deidptIDs(self):
+        """
+        Read and store previously used deidentified patient IDs.
+        These should follow standard naming convention set out in the XLS.
+        They are stored in the datasheet, column self.XLSDATA_DEIDPTID
+        Lookup dict is xls_ID_lookup{}
         """
         self.log('.cache_used_ptids(): Started.', self.LOGLEVEL_DEBUG)
-
-        # Probably unnecessary re-definition/reset
         self.xls_ID_lookup = {}
 
         row = self.first_datarow
         rs = str(row)
-        row_count = self.frontsheet[self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL].value
-        # +starting row -the data rows start at self.first_datarow
-        max_row = int(row_count + self.first_datarow)
+        deid_PTID = self.datasheet[self.XLSDATA_DEIDPTID + rs].value
+        real_PTID = self.datasheet[self.XLSDATA_PATIENTID + rs].value
 
-        check_ptID = self.datasheet[self.XLSDATA_PATIENTID + rs].value
-        check_deidUID = self.datasheet[self.XLSDATA_DEIDUID + rs].value
-        check_real_SUID = self.datasheet[self.XLSDATA_STUDYUID + rs].value
-
-        while (check_deidUID is not None) and (
-               check_ptID is not None) and (
-               row <= max_row):
-            self.xls_UID_lookup[check_real_SUID] = row
-            # if raw_dt_delta:
-            #    self.dt_delta[ check_ptID ] = self.delta_str2obj(raw_dt_delta)
+        while deid_PTID is not None:
+            if real_PTID not in self.xls_ID_lookup:
+                self.xls_ID_lookup[real_PTID] = deid_PTID
+            else:  # Raise exception if REAL ID points to a different Deid ID
+                if deid_PTID != self.xls_ID_lookup[real_PTID]:
+                    self.msg('\nERROR: real ID with mismatch DeId IDs.\n' +
+                             f'datasheet row {row}\nreal ' +
+                             f'PatientID \"{real_PTID}\" ' +
+                             f'linked with BOTH \"{deid_PTID}\"' +
+                             f' AND \"{self.xls_ID_lookup[real_PTID]}\"'
+                             )
+                    raise AssertionError('Real and DeId ptID duplicate')
             row += 1
             rs = str(row)
-            check_ptID = self.datasheet[self.XLSDATA_PATIENTID + rs].value
-            check_deidUID = self.datasheet[self.XLSDATA_DEIDUID + rs].value
-            check_real_SUID = self.datasheet[self.XLSDATA_STUDYUID + rs].value
-            # raw_dt_delta = self.datasheet[ self.XLSDATA_DT_DELTA + rs].value
+            deid_PTID = self.datasheet[self.XLSDATA_DEIDPTID + rs].value
+            real_PTID = self.datasheet[self.XLSDATA_PATIENTID + rs].value
 
-        self.log(f'self.cache_existing_xls_UIDs: Completed OK. Found&cached ' +
-                 '{len(self.xls_UID_lookup)} existing UIDs.  Final row={row}',
+        self.log(f'<>.cache_used_deidptIDs: Completed OK. Found&cached ' +
+                 f'{len(self.xls_ID_lookup)} unique deidIDs.  Final row={row}',
                  self.LOGLEVEL_HIGH)
+        self.msg(f'<>.cache_used_deidptIDs:  Found&cached ' +
+                 f'{len(self.xls_ID_lookup)} unique deidIDs.  Final row={row}')
         return True
 
     def cache_dt_delta(self):
@@ -709,13 +911,13 @@ class Study_Class():
 
     # ------------------------------------------------------------------------
 
-    def log(self, message_str, msg_log_level=LOGLEVEL_NORMAL):
+    def log(self, message_str, msg_log_level=' '):
         '''
-        This is supposed to add a new line to the log page in the XLS file,
-        describing a change.
+        This adds a new line to the XLS log page
         Perhaps this is a good place to set log level...
         log levels: debug = 3, high = 2, normal = 1
         '''
+        # study.LOGLEVEL_NORMAL == 1 and is default
         # Only logs messages that are at or below the global log level.
         # So debug msgs will bot be logged in high or normal logging
         if (msg_log_level > self.GLOBAL_LOGLEVEL):
@@ -753,17 +955,18 @@ class Study_Class():
         Returns the Study Instance UID from the specified DICOM file object
         Usage:   string_variable = <object>.get_DCM_StudyInstanceUID( )
         Returns:  a string containing the study instance UID.
-                            returns FALSE if no StudyInstanceUID tag is found.
-        This iterates through all tags until it finds the correct one.
+                            returns None if no StudyInstanceUID tag is found.
+        This iterates through all tags until it finds the 1st StudyInstanceUID.
         This bypasses the issue with DICOMDIR hiding it in a ?series?
-        which is not visible to the standard pydicom.StudyInstanceUID method.
+        which is not visible to the standard pydicom.StudyInstanceUID method,
+        which is probably the cause of fails with DICOMDIR.
+        Note: This is not appropriate for use in a DICOMDIR file
         '''
-        siUID = False
-        for elem in self.DCM.iterall():
-            if 'Study Instance UID' == elem.name:
-                siUID = elem.value
+        siUID = None
+        for element in self.DCM.iterall():
+            if 'Study Instance UID' == element.name:
+                siUID = element.value
                 break   # Stops at 1st StudyInstanceUID
-        # If no StudyInstanceUID tag is found, this returns False
         return siUID
 
     def get_old_study_attrib_from_UID(self, attribute, test_uid):
@@ -826,113 +1029,16 @@ class Study_Class():
             value = failure_value
         return value
 
-    def assign_new_si_UID(self):  # XLS openpyxl workbook object
-        '''
-        Returns the new studyID, and populates current
-        DCM data into corresponding datasheet row & logs made
-        and iterates down the studyID list with each new call.
-        Built-in check to see if exceeded number of valid studyIDs
-        '''
-        # - todo: Works but maybe not as expected...
-        self.log('running: assign_new_si_UID()', self.LOGLEVEL_DEBUG)
-
-        # If this is the 1st time running then do this
-        if self.next_studyID_row == 0:
-            self.next_studyID_row = self.first_available_studyID_row()
-
-        new_studyID = self.datasheet[self.XLSDATA_DEIDUID +
-                                     str(self.next_studyID_row)].value
-        new_UID = self.DCM.StudyInstanceUID
-        no_of_studyIDs = self.frontsheet[
-            self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL].value
-
-        # Check to see if we have exceeded available StudyIDs
-        if self.next_studyID_row > (no_of_studyIDs + 1) and (
-                                                          new_studyID is None):
-            self.log('<obj>.assign_nw_si_UID: Run out of Study IDs' +
-                     'in the xls file!!!', self.LOGLEVEL_NORMAL)
-            return False
-        elif self.next_studyID_row > (no_of_studyIDs + 1) and (
-                                                      new_studyID is not None):
-            # There is a mismatch-
-            self.log(f'<>.assign_new_si_ID: WARNING -- ' +
-                     f'next_studyID_row ({self.next_studyID_row}) is more ' +
-                     f'than no_of_studyIDs ({no_of_studyIDs}) but XLScell ' +
-                     f'is non-empty ({new_studyID}) -We assume a valid value',
-                     self.LOGLEVEL_NORMAL)
-
-        # Populate current DCM data into XLS datasheet studyID into
-        dateobject = datetime.now()
-        xls_row = str(self.next_studyID_row)
-
-        dateadded = str(dateobject.strftime('%d-%m-%Y'))
-        timeadded = str(dateobject.strftime('%H:%M:%S'))
-        self.datasheet[self.XLSDATA_DATEADDED + xls_row] = dateadded
-        self.datasheet[self.XLSDATA_TIMEADDED + xls_row] = timeadded
-
-        ptID = str(self.try_dcm_attrib('PatientID', 'Nil'))
-        ptName = str(self.try_dcm_attrib('PatientName', 'Nil'))
-        self.datasheet[self.XLSDATA_PATIENTID + xls_row] = ptID
-        self.datasheet[self.XLSDATA_PATIENTNAME + xls_row] = ptName
-
-        accession = str(self.try_dcm_attrib('AccessionNumber', 'Nil'))
-        self.datasheet[self.XLSDATA_ACCESSIONNUMBER + xls_row] = accession
-
-        studydate = str(self.try_dcm_attrib('StudyDate', 'Nil'))
-        self.datasheet[self.XLSDATA_STUDYDATE + xls_row] = studydate
-        studytime = str(self.try_dcm_attrib('StudyTime', 'Nil'))
-        self.datasheet[self.XLSDATA_STUDYTIME + xls_row] = studytime
-        studyuid = str(self.try_dcm_attrib('StudyInstanceUID', 'Nil'))
-        self.datasheet[self.XLSDATA_STUDYUID + xls_row] = studyuid
-        studydesc = str(self.try_dcm_attrib('StudyDescription', 'Nil'))
-        self.datasheet[self.XLSDATA_STUDYDESCRIPTION + xls_row] = studydesc
-
-        self.CurrStudy.delta = self.create_dt_delta(self.DCM.StudyDate,
-                                                    self.DCM.StudyTime)
-        delta = delta_obj2str(self.CurrStudy.delta)
-        self.datasheet[self.XLSDATA_DT_DELTA + xls_row] = delta
-        # DateTime Delta in 'days:seconds.microseconds' format
-
-        # insert Logging message(s) here. Only 1 will be sent
-        # - depending on global_log_level
-        if self.log('running: assign_new_si_si_UID() in generator loop',
-                    self.LOGLEVEL_DEBUG):
-            pass
-        elif self.log(f'Assigned {new_studyID} to ' +
-                      f'{self.try_dcm_attrib("PatientID", "No_ID") }',
-                      self.LOGLEVEL_HIGH):
-            pass
-        else:
-            self.log(f'Assigned new StudyID to {new_UID}',
-                     self.LOGLEVEL_NORMAL)
-
-        # Update the dict_cache.  Perhaps better to use in a class...
-        self.xls_UID_lookup[new_UID] = self.next_studyID_row
-
-        # Increment next_studyID_row to point to the next row
-        self.next_studyID_row += 1
-
-        # return the new studyID string
-        return new_studyID
-
-    def deidentifyDICOM(self, newPtName='Anon', newPtID='research'):
+#    def deidentifyDICOM(self, newPtName='Anon', newPtID='research'):
+    def deidentifyDICOM(self):
         '''Performs the removal of PHI
         Including applying the DateTime delta to ALL Date,
         Time and DateTime VRs
         '''
-        self.msg('->deidentityDICOM...', level='DICOM')
-        # enact FLAG based actions - need to sync this with XLS flag list
-        if self.flag_dict['DEL_PRIVATE_FLAG']:
-            self.DCM.remove_private_tags()
-            self.msg('removing private tags', level='DEBUG')
+        self.msg('->deidentityDICOM...', level='DEBUG')
 
-        if self.flag_dict['DEL_CURVES_FLAG']:
-            self.DCM.walk(del_curves_callback)
-            self.msg('removig curves', level='DEBUG')
-
-        if self.flag_dict['CROP_US_TOPBAR_FLAG'] and self.DCM.Modality == 'US':
-            self.blankTopBar()
-            self.msg('blank topbar', level='DEBUG')
+        # This first as it might reduce the number of tags hugely
+        self.perform_flag_actions()
 
         # dt_delta:
         # if 'PRESERVE_PT_TIMELINE' is True, the delta will ne non-zero.
@@ -947,21 +1053,42 @@ class Study_Class():
         self.DCM.walk(self.Perform_VR_Actions)
 
         # enact TAG-based actions
+        self.perform_tag_actions()
+
+    def perform_flag_actions(self):
+        # enact FLAG based actions - need to sync this with XLS flag list
+        if self.flag_dict['DEL_PRIVATE_FLAG']:
+            self.DCM.remove_private_tags()
+            self.msg('removing private tags', level='DEBUG')
+
+        if self.flag_dict['DEL_CURVES_FLAG']:
+            self.DCM.walk(del_curves_callback)
+            self.msg('removig curves', level='DEBUG')
+
+        if self.flag_dict['CROP_US_TOPBAR_FLAG'] and self.DCM.Modality == 'US':
+            self.blankTopBar()
+            self.msg('blank topbar', level='DEBUG')
+
+    def perform_tag_actions(self):
+        """
+        Apply tag-based actions to the current DCM header
+        """
         for [group, element, action, repvalue] in self.tag_action_list:
             # print(f'{pretty_tag(group,element)}
             # action: {action}, rep value: {repvalue}')
+            action = action.lower()
             if [group, element] in self.DCM:  # If the tag already exists
                 exists = True
             else:
                 exists = False
 
-            # If action is 'replace' and tag exists
-            if action.lower() == 'replace' and exists:
-                if [group, element] in self.DCM:  # todo: redundant double check?
-                    self.DCM[group, element].value = repvalue
-            elif action.lower() == 'delete':
-                if [group, element] in self.DCM:  # use the exists status instead?
-                    del self.DCM[group, element]
+            if action == 'replace' and exists:
+                self.DCM[group, element].value = repvalue
+            elif action == 'replace' and not exists:
+                vr = DicomDictionary[combotag(group, element)][0]
+                self.DCM.add_new([group, element], vr, repvalue)
+            elif action == 'delete' and exists:
+                del self.DCM[group, element]
 
     # callback to enact Value Representation (VR) based actions
     def Perform_VR_Actions(self, dataset, data_element):
@@ -1071,14 +1198,28 @@ class Study_Class():
         picell = 'A' + str(self.XLSFRONT_PI_CELL[-1])
         nstudyids = 'A' + str(self.XLSFRONT_NUMBER_OF_STUDYIDS_CELL[-1])
         irbcode = 'A' + str(self.XLSFRONT_IRB_CODE_CELL[-1])
-        # data held in xlsFront_study_title_cell
         self.frontsheet[titlecell] = 'Study Title:'
-        # data held in xlsFront_PI_cell
         self.frontsheet[picell] = 'Primary Investigator:'
-        # data held in xlsFront_number_of_study_IDs_cell
         self.frontsheet[nstudyids] = 'No of Study IDs'
-        # data held in xlsFront_IRB_code_cell
         self.frontsheet[irbcode] = 'Study IRB Code'
+
+        deid_format = 'A' + str(self.XLSFRONT_DEID_PTID_FORMAT[-1])
+        deid_prefix = 'A' + str(self.XLSFRONT_DEID_PTID_PREFIX[-1])
+        deid_digits = 'A' + str(self.XLSFRONT_DEID_PTID_DIGITS[-1])
+        self.frontsheet[deid_format] = 'deid PatientID format:'
+        self.frontsheet[deid_prefix] = 'deid PatientID prefix:'
+        self.frontsheet[deid_digits] = 'Minimum number of digits:'
+        self.frontsheet[self.XLSFRONT_DEID_PTID_FORMAT] = '<prefix><numeric>'
+        self.frontsheet[self.XLSFRONT_DEID_PTID_PREFIX] = 'deid'
+        self.frontsheet[self.XLSFRONT_DEID_PTID_DIGITS] = '6'
+        deid_format2 = 'C' + str(self.XLSFRONT_DEID_PTID_FORMAT[-1])
+        self.frontsheet[deid_format2] = 'preview:'
+        deid_format3 = 'D' + str(self.XLSFRONT_DEID_PTID_FORMAT[-1])
+        # Excel formula =CONCATENATE(B8,TEXT(123,REPT("0",B9)))
+        self.frontsheet[deid_format3] = f'=CONCATENATE(' + \
+                                        self.XLSFRONT_DEID_PTID_PREFIX + \
+                                        ',TEXT(123,REPT("0",' + \
+                                        self.XLSFRONT_DEID_PTID_DIGITS + ')))'
 
         self.frontsheet[self.XLSFRONT_STUDYTITLE_CELL] = new_study_title
         self.frontsheet[self.XLSFRONT_PI_CELL] = new_primary_investigator
@@ -1086,10 +1227,17 @@ class Study_Class():
         self.frontsheet[nstudyidsval] = new_number_of_study_IDs
         self.frontsheet[self.XLSFRONT_IRB_CODE_CELL] = '<enter value>'
 
+        diroutby_ptid = 'A' + str(self.XLSFRONT_DIROUTBY_PTID_CELL[1:])
+        self.frontsheet[diroutby_ptid] = 'Output DIR by ptID (True/False)'
+        self.frontsheet[self.XLSFRONT_DIROUTBY_PTID_CELL] = 'True'
+        orig_filenames = 'A' + str(self.XLSFRONT_ORIG_FILENAMES_CELL[1:])
+        self.frontsheet[orig_filenames] = 'Keep original filename (True/False)'
+        self.frontsheet[self.XLSFRONT_ORIG_FILENAMES_CELL] = 'False'
+
         # Row 1 is the column title row
         self.datasheet['A1'] = 'Data Page'
         self.datasheet[self.XLSDATA_DEIDUID + '1'] = 'DeId StudyUID'
-        self.datasheet[self.XLSDATA_DEIDPTNAME + '1'] = 'DeId Pt Name'
+        # self.datasheet[self.XLSDATA_DEIDPTNAME + '1'] = 'DeId Pt Name'
         self.datasheet[self.XLSDATA_DEIDPTID + '1'] = 'DeId Pt ID'
         self.datasheet[self.XLSDATA_DATEADDED + '1'] = 'Date Added'
         self.datasheet[self.XLSDATA_TIMEADDED + '1'] = 'Time Added'
@@ -1123,12 +1271,13 @@ class Study_Class():
         row = self.Config_Start_Row
         offset = 0
 
-        # VR based action rules
+        # VR based action rules ----------------------------------------------
         for action in self.list_of_vr_actions:
             self.cfgsheet[self.VR_Action_Col + str(row + offset)] = action
             offset += 1
 
-        # flags - need to include current list of flags and default values
+        # flags --------------------------------------------------------------
+        # need to include current list of flags and default values
         self.cfgsheet[self.FLAG_COL + '1'] = 'FLAG ACTION'
         self.cfgsheet[self.FLAG_VAL_COL + '1'] = 'VALUE'
         self.cfgsheet[self.FLAG_VAL_COL + '2'] = '(TRUE/blank/value)'
@@ -1145,7 +1294,7 @@ class Study_Class():
             self.cfgsheet[self.FLAG_VAL_COL + str(row + offset)] = default_val
             offset += 1
 
-        # tags
+        # tags ---------------------------------------------------------------
         self.cfgsheet[self.Tag_Name_Col + '1'] = 'Tag Name (autofilled)'
         self.cfgsheet[self.Tag_Group_Col + '1'] = 'Dicom Tag (hex)'
         self.cfgsheet[self.Tag_Group_Col + '2'] = 'group'
@@ -1153,6 +1302,17 @@ class Study_Class():
         self.cfgsheet[self.Tag_Action_Col + '1'] = 'Action'
         self.cfgsheet[self.Tag_Action_Col + '1'] = '(DELETE/REPLACE)'
         self.cfgsheet[self.Tag_RVal_Col + '1'] = 'Replacement Value'
+
+        # insert default tag values from .tag_default list
+        row = self.Config_Start_Row
+        offset = 0
+        for tag_data in self.tag_default:
+            row_str = str(row + offset)
+            self.cfgsheet[self.Tag_Group_Col + row_str] = tag_data[0]
+            self.cfgsheet[self.Tag_Element_Col + row_str] = tag_data[1]
+            self.cfgsheet[self.Tag_Action_Col + row_str] = tag_data[2]
+            self.cfgsheet[self.Tag_RVal_Col + row_str] = tag_data[3]
+            offset += 1
 
     def blankTopBar(self, topbarWidth: int = 50):
         """Blanks top of [US] images to remove PHI
@@ -1391,14 +1551,6 @@ def delta_obj2str(delta: timedelta) -> str:
 # ---------------------------------------------------------
 
 # Console text input and return valid string
-
-
-def verify_txt_input(message='no argument supplied'):
-    inputtext = input(message)
-    while not inputtext.replace(' ', '').isalpha():
-        print('Invalid text entry. Please enter alphabetical characters only.')
-        inputtext = input(message)
-    return inputtext
 
 
 def number_possible_IDs(format):

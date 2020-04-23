@@ -34,15 +34,51 @@ class Ops_Class():
 
 def process_file(study, filename: str) -> int:
     # ----------- Try to open with pydicom
+    if not try_load_DCM(study, filename):
+        return False
+
+    # Get the DCM StudyInstanceUID.
+    # If there is no StudyInstanceUID tag (bad file) returns False
+    study.CurrStudy.StudyInstanceUID = study.get_DCM_StudyInstanceUID()
+    if study.CurrStudy.StudyInstanceUID is None:
+        study.msg('Invalid DICOM: No StudyInstanceUID tag is present.')
+        return False
+
+    # update the values in study.CurrStudy class
+    study._update_fromDCM()
+
+    # give deid_UID and deid_ptID
+    study._get_deid_data()
+
+    # Perform deidentification on loaded DICOM data
+    # study.deidentifyDICOM(study.CurrStudy.AnonName, study.CurrStudy.AnonUID)
+    study.deidentifyDICOM()
+
+    study.DCM.preamble = study.NEW_PREAMBLE
+
+    deident_method = f'BatchDeident with {study.xls_filename}'
+    study.DCM.add_new('DeidentificationMethod', 'LO', deident_method)
+
+    # study.DCM.save_as(study.CurrStudy.savefilename, write_like_original=True)
+    # Replace with more flexible function to allow deid_ptID folders
+    study._saveDCM()
+
+    return True
+
+
+def try_load_DCM(study, filename):
+    """
+    Try to load DCM files.
+    Fail gracefully if possibly.
+    """
+    load_warning = ''
     try:
         study.DCM = pydicom.filereader.dcmread(filename, force=True)
 
-        load_warning = ''
-
         for tag in study.DCM_TAG_CHECKLIST:
-            # this fn. returns '-blank' (as supplied failure string) if the
+            # returns '-absent' (as supplied string) if the
             # queried tag is not present.
-            if study.try_dcm_attrib(tag, '-blank-') == '-blank-':
+            if study.try_dcm_attrib(tag, '-absent') == '-absent':
                 load_warning += (tag + ' ')
 
     except:  # noqa If file loading fails for whatever reason
@@ -51,46 +87,8 @@ def process_file(study, filename: str) -> int:
 
     if load_warning != '':
         study.msg(f'{filename} : {load_warning}\n\t\t')
-
-    study.msg('De-identify', endstr='')
-
-    # Get the DCM StudyInstanceUID.
-    # If there is no StudyInstanceUID tag (bad file) returns False
-    study.check_si_UID = study.get_DCM_StudyInstanceUID()
-
-    # If StudyTime tag is absent, make one
-    if 'StudyTime' not in study.DCM:
-        study.DCM.StudyTime = "000000"
-
-    # update the values in study.CurrStudy class
-    study._update_fromDCM()
-
-    # Check if StudyInstanceUID has match in cache
-    if study.check_si_UID in study.xls_UID_lookup:
-        # retrieve the previous studyID linked to the UID
-        study.CurrStudy.AnonID = study.get_old_study_attrib_from_UID(
-            study.XLSDATA_DEIDUID,
-            study.check_si_UID
-            )
-        print(f' - Known UID, using {study.CurrStudy.AnonID}')
-    else:
-        # If UNIQUE study UID ie. not in cache
-        study.CurrStudy.AnonID = study.assign_new_si_UID()
-        print(f' - Unique UID - Assigning {study.CurrStudy.AnonID}')
-
-    # Perform deidentification on loaded DICOM data
-    study.deidentifyDICOM(study.CurrStudy.AnonName, study.CurrStudy.AnonID)
-
-    # replace the preamble.
-    study.DCM.preamble = study.NEW_PREAMBLE
-
-    # todo: Change tag to show DCM is deidentified/anonymised
-    # as per relevent standard [needs reference]
-
-    # Write de-identified DICOM to disc
-    study.DCM.save_as(study.CurrStudy.savefilename, write_like_original=True)
-
     return True
+
 
 # ---------------------------------------------------------------------------
 
