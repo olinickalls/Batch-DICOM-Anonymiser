@@ -155,8 +155,9 @@ class Study_Class():
     XLSFRONT_DEID_PTID_PREFIX = 'B8'
     XLSFRONT_DEID_PTID_DIGITS = 'B9'
     XLSFRONT_DIROUTBY_PTID_CELL = 'B11'
-
     XLSFRONT_ORIG_FILENAMES_CELL = 'B13'
+
+    
 
     XLSDATA_DEIDUID = 'B'
     XLSDATA_DEIDPTID = 'C'
@@ -353,6 +354,9 @@ class Study_Class():
     REF_MM = 00
     REF_SS = 00
 
+    ORIG_FILENAMES = False  # Default value
+    DIROUTBY_PTID = True   # Default value
+
     # *********************************************************************
     # *                     Start of Methods                              *
     # *********************************************************************
@@ -476,6 +480,8 @@ class Study_Class():
         self.logsheet = self.XLS['Log']
         self.cfgsheet = self.XLS['Config']
 
+        self._import_frontsheet_data()
+
         self.find_first_available_log_row()
 
         self.cache_used_UIDs()
@@ -535,6 +541,31 @@ class Study_Class():
             row += 1
             rowstr = str(row)
             action = self.cfgsheet[self.Tag_Action_Col + rowstr].value
+
+    def _import_frontsheet_data(self):
+        """
+        Import the data from the XLS FRONTsheet
+        ie. Directory structure and PtID config
+        """
+        out_dir = self.frontsheet[self.XLSFRONT_DIROUTBY_PTID_CELL].value
+        out_dir = out_dir.strip().lower()
+        if out_dir == 'true':
+            self.DIROUTBY_PTID = True
+        elif out_dir == 'false':
+            self.DIROUTBY_PTID = False
+        else:
+            self.msg('Using default "Output DIR by ptID": ' +
+                     f'{self.DIROUTBY_PTID}"')
+
+        orig_fns = self.frontsheet[self.XLSFRONT_ORIG_FILENAMES_CELL].value
+        orig_fns = orig_fns.strip().lower()
+        if orig_fns == 'true':
+            self.ORIG_FILENAMES = True
+        elif orig_fns == 'false':
+            self.ORIG_FILENAMES = False
+        else:
+            self.msg('Using default "Keep original filename": ' +
+                     f'{self.ORIG_FILENAMES}"')
 
     def _saveDCM(self):
         """
