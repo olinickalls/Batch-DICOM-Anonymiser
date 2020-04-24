@@ -15,6 +15,7 @@ import getpass
 import os
 from datetime import date, time, datetime, timedelta
 import numpy as np  # For DICOM pixel operations
+from pathlib import Path
 
 
 # ----------------------> Constants <-------------------------------
@@ -107,25 +108,26 @@ class FileStats_Class():
 
 
 class BasicDetails():
-    # AnonName = ""
-    AnonPtID = ""
-    AnonUID = ""
-    PatientID = ""
-    StudyInstanceUID = ""
+    # AnonName = ''
+    AnonPtID = ''
+    AnonUID = ''
+    PatientID = ''
+    StudyInstanceUID = ''
     delta = None
 
-    testfilename = ""
-    savefilename = ""
+    in_file = ''
+    in_relpath = ''
+    savefilename = ''
 
     def clean(self):
-        # self.AnonName = ""
-        self.AnonPtID = ""
-        self.AnonUID = ""
-        self.PatientID = ""
-        self.StudyInstanceUID = ""
+        # self.AnonName = ''
+        self.AnonPtID = ''
+        self.AnonUID = ''
+        self.PatientID = ''
+        self.StudyInstanceUID = ''
         self.delta = None
-        self.testfilename = ""
-        self.savefilename = ""
+        self.in_file = ''
+        self.rel_path = ''
 
 
 # ####################################################################
@@ -139,6 +141,8 @@ class Study_Class():
     # The constants could be moved into a separate 'from _ import *' as they
     # don't, need to be accessed through the class -I just want them global
     CurrStudy = BasicDetails()
+
+    anon_baseDIR = Path('')
 
     QUIET = False
     VERBOSE = False
@@ -156,8 +160,6 @@ class Study_Class():
     XLSFRONT_DEID_PTID_DIGITS = 'B9'
     XLSFRONT_DIROUTBY_PTID_CELL = 'B11'
     XLSFRONT_ORIG_FILENAMES_CELL = 'B13'
-
-    
 
     XLSDATA_DEIDUID = 'B'
     XLSDATA_DEIDPTID = 'C'
@@ -354,6 +356,7 @@ class Study_Class():
     REF_MM = 00
     REF_SS = 00
 
+    DIR_SUFF = '-anon'  # Default
     ORIG_FILENAMES = False  # Default value
     DIROUTBY_PTID = True   # Default value
 
@@ -548,6 +551,8 @@ class Study_Class():
         ie. Directory structure and PtID config
         """
         out_dir = self.frontsheet[self.XLSFRONT_DIROUTBY_PTID_CELL].value
+        if out_dir is None:
+            out_dir = ''
         out_dir = out_dir.strip().lower()
         if out_dir == 'true':
             self.DIROUTBY_PTID = True
@@ -576,7 +581,7 @@ class Study_Class():
          - keep original filename or
            use <deident_siUID>.DCM as filename
 
-        Duplicate filenames appended by _n
+        (Duplicate filenames appended by _n) - Not implemented
 
         Currently only original save structure implemented.
         -Add XLSX option DIR style and FILENAME option
@@ -584,11 +589,32 @@ class Study_Class():
         -Implement at dir creation (create or not)
         -Implement at save DCM (create correct savepath)
         """
-        self.DCM.save_as(self.CurrStudy.savefilename, write_like_original=True)
-        pass
+
+        if self.ORIG_FILENAMES:
+            filename = self.CurrStudy.in_file.name
+        else:
+            filename = self.CurrStudy.AnonUID + '.DCM'
+
+        if self.DIROUTBY_PTID:  # proceed to save under deid_pt directories
+            path = self.anon_baseDIR / Path(self.CurrStudy.AnonPtID)
+        else:    # mirror original dir structure with Anon base dir
+            path = self._append_topdir(self.CurrStudy.in_relpath, self.DIR_SUFF)
+
+        # NB: Pathlib operation
+        filepath = path / filename
+
+        create_dir(path)
+        self.DCM.save_as(str(filepath), write_like_original=True)
+
+    def _append_topdir(self, orig_path, new_top):
+        dir_list = list(orig_path.parts)
+        dir_list[0] = Path(dir_list[0] + str(new_top))
+        out_dir = Path()
+        for dir in dir_list:
+            out_dir = out_dir / dir
+        return out_dir
 
     # ----------------------------------------------------------------------
-
     def _get_deid_data(self):
         """
         Look up deid UID and Pt ID.
@@ -599,7 +625,7 @@ class Study_Class():
         # 1. Check PtID
         if self.DCM.PatientID in self.xls_ID_lookup:
             self.CurrStudy.AnonPtID = self.xls_ID_lookup[self.DCM.PatientID]
-            print(f'using deid_PtID={self.CurrStudy.AnonPtID}', end='')
+            self.msg(f'PtID: {self.CurrStudy.AnonPtID}, ', endstr='')
         else:
             self.assign_deid_ptID()
             # print(f'New deid PtID={self.CurrStudy.AnonPtID}')
@@ -610,7 +636,7 @@ class Study_Class():
                 self.XLSDATA_DEIDUID,
                 self.DCM.StudyInstanceUID  # check_si_UID
                 )
-            print(f' - Known UID, using {self.CurrStudy.AnonUID}')
+            self.msg(f'UID: {self.CurrStudy.AnonUID}', endstr='')
         else:
             # If UNIQUE study UID ie. not in cache
             self.CurrStudy.AnonUID = self.assign_new_si_UID()
@@ -920,7 +946,6 @@ class Study_Class():
     def readXLSFlags(self):
         for item in self.flag_list:
             self.flag_dict[item] = self.cfgsheet[self.flag_cell[item]].value
-            # self.msg(f'Flag {item}: {self.flag_dict[item]} (new method)')
 
         for item in self.flag_dict:
             print(f'readXLSFlags: flag_dict[{item}] = {self.flag_dict[item]}')
@@ -1056,7 +1081,7 @@ class Study_Class():
         '''
         try:
             value = self.DCM.data_element(attrib_str).value
-        except:  # noqa -> Not sure exactly what error is returned from pydicom
+        except KeyError:  # noqa -> Not sure exactly what error is returned from pydicom
             value = failure_value
         return value
 
@@ -1066,8 +1091,6 @@ class Study_Class():
         Including applying the DateTime delta to ALL Date,
         Time and DateTime VRs
         '''
-        self.msg('->deidentityDICOM...', level='DEBUG')
-
         # This first as it might reduce the number of tags hugely
         self.perform_flag_actions()
 
@@ -1094,7 +1117,7 @@ class Study_Class():
 
         if self.flag_dict['DEL_CURVES_FLAG']:
             self.DCM.walk(del_curves_callback)
-            self.msg('removig curves', level='DEBUG')
+            self.msg('removing curves', level='DEBUG')
 
         if self.flag_dict['CROP_US_TOPBAR_FLAG'] and self.DCM.Modality == 'US':
             self.blankTopBar()
@@ -1143,17 +1166,20 @@ class Study_Class():
         # delta should be in a format useable by the datetime module
         # DICOM date format is 'yyyymmdd', older format 'yyyy:mm:dd'
         # DICOM time format is 'HHMMSS.FFFFFF'
+        # time format also allows HHMM only.
         # http://dicom.nema.org/dicom/2013/output/chtml/part05/sect_6.2.html
         oTime = remove(oTime_raw, ':.')  # strip out expected non-numerics
         oDate = remove(oDate_raw, ':.')
         if not oTime:
             oTime = "000000000000"
+        if len(oTime) == 4:  # add SS if missing
+            oTime += '00'
         d_yyyy = int(oDate[:4])
         d_mm = int(oDate[4:6])
         d_dd = int(oDate[6:8])
         t_hh = int(oTime[0:2])
         t_mm = int(oTime[2:4])
-        t_ss = int(oTime[4:6])
+        t_ss = int(oTime[4:6])  # Need to allow for 4 char long TM tags
         if len(oTime[4:]) > 3:  # ie if the seconds contains float
             #  Get miliseconds
             t_ms = int(oTime[6:])
@@ -1674,3 +1700,15 @@ def remove(inputstr: str, the_list: str) -> str:
         if char not in the_list:
             out_str += char
     return out_str
+
+
+def create_dir(dir_name):
+    if not os.path.isdir(dir_name):
+        try:
+            os.makedirs(dir_name)
+        except FileExistsError:
+            # Dir already present. No need to handle.
+            raise
+        except OSError:
+            print(f'Fatal Error: Failed to create dir: {dir_name}')
+            raise

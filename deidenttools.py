@@ -33,16 +33,36 @@ class Ops_Class():
 # ####################################################################
 
 def process_file(study, filename: str) -> int:
+    # --------------- Checks before deidentifying
+    if filename.name in study.SKIP_LIST:
+        # stats.skipped_dcm_filenames.append(fname)
+        # study.msg(' - file ignored.')
+        # stats.ignored += 1
+        # continue
+        return 'File Ignored.'
+
+    # Check 'fourCC' (bytes from 128 to 132) = "DICM"
+    DICOM_fourCC = check_fourCC(study.CurrStudy.in_file)
+    if not DICOM_fourCC:
+        # study.msg('Invalid DICOM: Missing or wrong fourCC', endstr='')
+        # stats.not_DCM_filenames.append(f'{fname}: non-dicom fourcc')
+        # stats.nondicom += 1
+        # continue
+        return 'Invalid DICOM: Missing or wrong fourCC'
+
     # ----------- Try to open with pydicom
     if not try_load_DCM(study, filename):
-        return False
+        return 'Open Failed.'
 
     # Get the DCM StudyInstanceUID.
     # If there is no StudyInstanceUID tag (bad file) returns False
     study.CurrStudy.StudyInstanceUID = study.get_DCM_StudyInstanceUID()
     if study.CurrStudy.StudyInstanceUID is None:
-        study.msg('Invalid DICOM: No StudyInstanceUID tag is present.')
-        return False
+        # study.msg('Invalid DICOM: No StudyInstanceUID tag is present.')
+        return 'Invalid DICOM: No StudyInstanceUID tag is present.'
+
+    # ------------ Presumed valid openable DICOM
+    study.msg('Deid: ', endstr='')
 
     # update the values in study.CurrStudy class
     study._update_fromDCM()
@@ -63,17 +83,18 @@ def process_file(study, filename: str) -> int:
     # Replace with more flexible function to allow deid_ptID folders
     study._saveDCM()
 
-    return True
+    return None
 
 
 def try_load_DCM(study, filename):
     """
     Try to load DCM files.
     Fail gracefully if possibly.
+    Expects a pathlib (Path) object for filename
     """
     load_warning = ''
     try:
-        study.DCM = pydicom.filereader.dcmread(filename, force=True)
+        study.DCM = pydicom.filereader.dcmread(str(filename), force=True)
 
         for tag in study.DCM_TAG_CHECKLIST:
             # returns '-absent' (as supplied string) if the
@@ -107,6 +128,13 @@ def create_dir(dir_name, verbose=True):
 
 
 def check_fourCC(filename):
+    """
+    Open file and check the 4 bytes from position 128.
+    DICOM standard expects them to be 'DICM'
+    returns: True if present & correct.
+             False otherwise.
+    Pathlib object safe.
+    """
     with open(filename, "r", encoding="Latin-1") as file:
         file.seek(128, 0)
         line = file.read(4)

@@ -23,6 +23,7 @@ Planned enhancements:
 '''
 
 import os
+from pathlib import Path
 # import sys
 # import pydicom    # DICOM file tools
 # import shutil     # used for just file copying.
@@ -32,7 +33,6 @@ import studymodules     # Study_Class and methods etc.
 import argparse
 # Next 2 lines used to get filename and path info
 from inspect import currentframe, getframeinfo
-from pathlib import Path
 
 global stats
 stats = studymodules.FileStats_Class()
@@ -145,77 +145,41 @@ study.msg(f'\nFound {files} files in {dirs} directories.\n')
 # Loop through all the folders/files in file_paths[]
 # each file/path listed is set as baseDir
 for baseDir in file_paths:
-    study.msg(f'{baseDir}\\')
-
-    # If the IRB code is set then use that as anonymised pt name
-    if study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value:
-        study.CurrStudy.AnonName = study.frontsheet[study.XLSFRONT_IRB_CODE_CELL].value
-    else:
-        # If no IRB code then this:
-        # This takes the characters to the right of the last '\\' in the path
-        # and makes it the default anonymised pt name
-        # eg if baseDir = 'c:\mydicim\ptZERO' then AnonName becomes 'ptZERO'
-        # The slicing /could/ be made more readable...
-        study.CurrStudy.AnonName = baseDir[-baseDir[-1::-1].find('\\'):]
-
     stats.reset_sub()
+    study.anon_baseDIR = Path(baseDir + study.DIR_SUFF)
+    # anonbase = Path(baseDir + study.DIR_SUFF)
 
-    # small bit of code to strip the deepest
-    # dir tree from baseDir
-    # then append with '-anon'
-    #
-    # e.g. from C:\mystuff\sub\dcmfiles
-    #      to   C:\mystuff\sub\dcmfiles_anon
-    #
-    #  needs to work within the os.walk() loop below.
-    # 1- strip the baseDir from the left of the string
-    # 2- insert the anonymised root in that space
-    # This can only work because the final \ is not
-    # present at the end of the paths presented by os.walk
+    # append the deepest dir level from baseDir
+    # with study.DIR_SUFF (This defaults to '-anon')
+    # e.g. from .\mystuff\sub\files  (from command line input)
+    #      to   .\mystuff-anon\sub\files
 
-    # loop through each directory off the baseDir
     for dirName, subdirList, fileList in os.walk(baseDir):
-
+        study.msg(f'\n\n{dirName}\\', endstr='')
         stats.start_subdir(subdirList, fileList)
-        dirNameAnon = baseDir + '-anon' + dirName[len(baseDir):]
 
-        # Create the directories as we come across them.
-        create_dir(dirNameAnon, verbose=True)
-        stats.dir_count += 1  # assumed created OK (error raised if not)
+        # If NOT study.DIROUTBY_PTID, then mirror the dirs as we go.
+        # Else we create deid_ptID dirs when saving DCMs
+        if not study.DIROUTBY_PTID:
+            dirNameAnon = study._append_topdir(Path(dirName), study.DIR_SUFF)
+            create_dir(dirNameAnon, verbose=True)
+            stats.dir_count += 1
 
-        # loop through each file in current directory
         for fname in fileList:
+            # todo: tidy thess variables- not all are used
             study.CurrStudy.clean()
-            study.CurrStudy.testfilename = f'{dirName}\\{fname}'
-            study.CurrStudy.savefilename = f'{dirNameAnon}\\{fname}'
+            study.CurrStudy.in_relpath = Path(dirName)
+            study.CurrStudy.in_fname = Path(fname)
+            study.CurrStudy.in_file = Path(dirName) / Path(fname)
 
-            fname_str = "'" + fname + "'"
-            study.msg(f"\n\t{fname_str.ljust(30,' ')} ", endstr='')
-
-            # --------------- Checks before deidentifying
-            # File in skip list?
-            if fname in study.SKIP_LIST:
-                stats.skipped_dcm_filenames.append(fname)
-                study.msg(' - file ignored.')
-                stats.ignored += 1
-                continue
-
-            # Check 'fourCC' (bytes from 128 to 132) = "DICM"
-            DICOM_fourCC = check_fourCC(study.CurrStudy.testfilename)
-            if not DICOM_fourCC:
-                study.msg('Invalid DICOM: Missing or wrong fourCC', endstr='')
-                stats.not_DCM_filenames.append(f'{fname}: non-dicom fourcc')
-                stats.nondicom += 1
-                continue
-
-            study.msg('Deidentify: ', endstr='')
+            study.msg(f"\n\t\'{fname}\'".ljust(30, ' '), endstr='')
 
             # The meat & bones of deidentification goes on here
-            deidOK = process_file(study, study.CurrStudy.testfilename)
-            if deidOK:
+            deidOK = process_file(study, study.CurrStudy.in_file)
+            if deidOK is None:
                 stats.anonok += 1
             else:
-                print('Load Failed...')
+                print(deidOK)
                 stats.anonfailed += 1
 
     # Stats on baseDir completion----
