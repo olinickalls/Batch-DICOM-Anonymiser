@@ -3,6 +3,8 @@
 \_pycache_
 
 *.spec
+*.xls
+*.xlsx
 \build
 \dist
 \html
