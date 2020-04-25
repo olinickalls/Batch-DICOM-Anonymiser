@@ -16,13 +16,6 @@
 
 \venv
 
-__pycache__/deident_helper.cpython-37.pyc
-__pycache__/deidenttools.cpython-37.pyc
-__pycache__/dicom_dictionary.cpython-37.pyc
-__pycache__/dicomdictionary.cpython-37.pyc
-__pycache__/study_modules.cpython-37.pyc
-__pycache__/studymodules.cpython-37.pyc
-my_study.xlsx
-~$my_study.xlsx
-my_study.xlsx
-test.xlsx
+\__pycache__
+*.pyc
+
